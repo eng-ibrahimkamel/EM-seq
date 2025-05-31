@@ -31,8 +31,29 @@ pwd=$(pwd)
 tmp="${pwd}/test_data/tmp"
 [ -d "${tmp}" ] || mkdir -p "${tmp}"
 
-ln -sf ${pwd}/test_data/emseq-test*.fastq.gz ${tmp}
-ln -sf ${pwd}/test_data/reference.fa ${tmp}
+# First ensure both paths are absolute
+src_dir=$(realpath "${pwd}/test_data")
+dst_dir=$(realpath "${tmp}")
+
+# For fastq files
+for file in "${src_dir}"/emseq-test*.fastq.gz; do
+    src_file=$(realpath "${file}")
+    dst_file="${dst_dir}/$(basename "${file}")"
+    if [ "${src_file}" != "$(realpath -m "${dst_file}")" ]; then
+        cp -f "${src_file}" "${dst_dir}/"
+    else
+        echo "Warning: Source and destination are the same file: ${file}"
+    fi
+done
+
+# For reference file
+src_ref=$(realpath "${src_dir}/reference.fa")
+dst_ref="${dst_dir}/reference.fa"
+if [ "${src_ref}" != "$(realpath -m "${dst_ref}")" ]; then
+    cp -f "${src_ref}" "${dst_dir}/"
+else
+    echo "Warning: Source and destination are the same file: reference.fa"
+fi
 
 # generate test data from minimal set of reads (fq/fq.gz/bam)
  echo "generating reads"

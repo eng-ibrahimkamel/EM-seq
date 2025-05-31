@@ -3,3 +3,4 @@ work
 output
 ngs-agg_revision.yaml
 .idea
+bin/miniconda3

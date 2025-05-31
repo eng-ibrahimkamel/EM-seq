@@ -1,4 +1,4 @@
- 
+
 
 process multiqc {
     label 'medium_cpu'
@@ -57,7 +57,7 @@ CONFIG
 
 process aggregate_emseq {
     tag { library }
-    conda "bioconda::samtools=1.9"
+    conda "bioconda::samtools=1.21"
     publishDir "${params.outputDir}/ngs-agg"
 
     input:         
@@ -96,7 +96,7 @@ process aggregate_emseq {
     unzip *fastqc.zip
 
     cat ${nonconverted_counts_tsv} | awk -v l=${library} '{print l"\t"\$0}' > ${library}.nonconverted_counts.for_agg.tsv
-    
+
     metadata=\$(echo "${fq_or_bam}" | awk '{if (\$1~/fastq/) {metad="fq"} else if (\$1~/bam/) {metad="_bam"}; print "--metadata"metad"_file "\$1}')
 
     export RBENV_VERSION=\$(cat \${path_to_ngs_agg}/.ruby-version)

@@ -8,6 +8,24 @@ if [ ! -f nextflow.config ]; then
     cp nextflow.config.example nextflow.config
 fi
 
+# Run install.sh if Miniconda installation doesn't exist
+if [ ! -d "$(pwd)/bin/miniconda3" ]; then
+    echo "Running install.sh to set up Miniconda and Nextflow..."
+    bash install.sh
+fi
+
+# Install samtools in the nextflow environment if needed
+if ! ./bin/miniconda3/bin/conda list -n nextflow | grep -q samtools; then
+    echo "Installing samtools in the nextflow environment..."
+    ./bin/miniconda3/bin/conda install -n nextflow -c conda-forge -c bioconda samtools=1.21 -y
+fi
+
+# Use local miniconda installation
+export PATH="$(pwd)/bin/miniconda3/bin:$PATH"
+
+# Activate the nextflow environment
+source "$(pwd)/bin/miniconda3/bin/activate" nextflow
+
 # set up tmp folder and copy test data into it
 pwd=$(pwd)
 tmp="${pwd}/test_data/tmp"
@@ -16,19 +34,9 @@ tmp="${pwd}/test_data/tmp"
 ln -sf ${pwd}/test_data/emseq-test*.fastq.gz ${tmp}
 ln -sf ${pwd}/test_data/reference.fa ${tmp}
 
-
-if [ "${GITHUB_ACTIONS:-}" == "true" ]; then
-    echo "gh actions..."
-else
-    micromamba create --name nextflow.emseq --yes python=3
-fi
-    micromamba install --name nextflow.emseq --yes bioconda:nextflow bioconda::samtools
-    eval "$(micromamba shell hook --shell bash)"
-    micromamba activate nextflow.emseq
-
 # generate test data from minimal set of reads (fq/fq.gz/bam)
  echo "generating reads"
- 
+
  # fastq (perhaps make 76bp long in future test)
  gunzip -c ${tmp}/emseq-testg_R1.fastq.gz > ${tmp}/emseq-test_R1.fastq
  gunzip -c ${tmp}/emseq-testg_R2.fastq.gz > ${tmp}/emseq-test_R2.fastq
@@ -100,4 +108,3 @@ test_pipeline "emseq-test*bam"
 
 cat ${pwd}/test.log.out
 echo "FINISHED"
-

@@ -1,8 +1,8 @@
 process enough_reads {
     label 'low_cpu'
     tag {library}
-    conda "bioconda::samtools=1.19"
-    
+    conda "bioconda::samtools=1.21"
+
     input:
         tuple val(email), 
               val(library), 
@@ -17,7 +17,7 @@ process enough_reads {
         """
         in1=\$(realpath ${input_file1})
         passes_or_fails="pass"
-        
+
         if grep -q "fastq.gz" <<< "${fileType}"; then
             [ \$(stat -c%s \${in1}) -lt 54 ] && passes_or_fails="fail"
         elif grep -q "fastq" <<< "${fileType}"; then 
@@ -32,7 +32,7 @@ process enough_reads {
 
 process send_email {
     label 'low_cpu'
-    
+
     input:
         file libraries
 
@@ -44,7 +44,7 @@ process send_email {
         cat \$f | awk '{print \$1"<br>"}' >> tmp 
     done
     libs=\$(cat tmp)
-    
+
     sendmail -t <<EOF
     To: ${params.email}
     Subject: File Read Check
@@ -63,7 +63,7 @@ process send_email {
 process alignReads {
     label 'high_cpu'
     tag { library }
-    conda "conda-forge::python=3.10 bioconda::bwameth=0.2.7 bioconda::fastp=0.23.4 bioconda::mark-nonconverted-reads=1.2 bioconda::sambamba=1.0 bioconda::samtools=1.19 bioconda::seqtk=1.4"
+    conda "conda-forge::python=3.10 bioconda::bwameth=0.2.7 bioconda::fastp=0.23.4 bioconda::mark-nonconverted-reads=1.2 bioconda::sambamba=1.0 bioconda::samtools=1.21 bioconda::seqtk=1.4"
     publishDir "${params.outputDir}/bwameth_align"
 
     input:
@@ -223,7 +223,7 @@ process alignReads {
     fi
 
     base_outputname="${library}_\${barcodes}_\${flowcell}"
-   
+
     set +o pipefail
     inst_name=\$(samtools view ${input_file1} | head -n 1 | cut -d ":" -f 1)
     set -o pipefail
@@ -233,7 +233,7 @@ process alignReads {
     bam2fastq="| samtools collate -f -r 100000 -u /dev/stdin -O | samtools fastq -n  /dev/stdin"
     # -n in samtools because bwameth needs space not "/" in the header (/1 /2)
 
- 
+
     eval \${stream_reads} \${bam2fastq} \
     | fastp --stdin --stdout -l 2 -Q \${trim_polyg} --interleaved_in --overrepresentation_analysis -j "\${base_outputname}.fastp.json" 2> fastp.stderr \
     | bwameth.py -p -t ${Math.max(1,(task.cpus*7).intdiv(8))} --read-group "\${rg_line}" --reference \${genome} /dev/stdin 2> "\${base_outputname}.log.bwamem" | reheader_sam /dev/stdin \
@@ -249,7 +249,7 @@ process mergeAndMarkDuplicates {
     label 'high_cpu'
     tag { library }
     publishDir "${params.outputDir}/markduped_bams", mode: 'copy', pattern: '*.md.{bam,bai}'
-    conda "bioconda::picard=3.1 bioconda::samtools=1.19"
+    conda "bioconda::picard=3.1 bioconda::samtools=1.21"
 
     input:
         tuple val(library), path(bam), path(bai), val(barcodes) 
@@ -264,7 +264,7 @@ process mergeAndMarkDuplicates {
     set +o pipefail
     inst_name=\$(samtools view ${bam} | head -n1 | cut -d ":" -f1);
     set -o pipefail
-    
+
     optical_distance=\$(echo \${inst_name} | awk '{if (\$1~/^M0|^NS|^NB/) {print 100} else {print 2500}}')
 
     picard -Xmx${task.memory.toGiga()}g MarkDuplicates \
@@ -291,7 +291,7 @@ process bwa_index {
 
     label 'low_cpu'
     tag { genome }
-    conda "bioconda::samtools=1.19 bioconda::bwameth=0.2.7"
+    conda "bioconda::samtools=1.21 bioconda::bwameth=0.2.7"
     storeDir "bwameth_index"
 
     output:

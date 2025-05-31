@@ -29,7 +29,7 @@ process gc_bias {
 process idx_stats {
     label 'medium_cpu'
     tag { library }
-    conda "bioconda::samtools=1.9"
+    conda "bioconda::samtools=1.21"
     publishDir "${params.outputDir}/stats/idxstats"
 
     input:
@@ -47,7 +47,7 @@ process idx_stats {
 process flag_stats {
     label 'medium_cpu'
     tag { library }
-    conda "bioconda::samtools=1.9"
+    conda "bioconda::samtools=1.21"
     publishDir "${params.outputDir}/stats/flagstats"
 
     input:
@@ -191,8 +191,7 @@ process picard_metrics {
 process tasmanian {
     label 'medium_cpu'
     tag { library }
-    publishDir "${params.outputDir}/stats/tasmanian"
-    conda "bioconda::samtools=1.9 bioconda::tasmanian-mismatch=1.0.7"
+    conda "bioconda::samtools=1.21 bioconda::tasmanian-mismatch=1.0.7"
 
     errorStrategy { retry < 1 ? 'retry' : 'terminate' }
     maxRetries 1

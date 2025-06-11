@@ -2,7 +2,9 @@ conda.enabled = true
 conda.useMicromamba = false
 conda.channels = ['conda-forge', 'bioconda', 'defaults']
 report.enabled = true
+report.overwrite = true
 timeline.enabled = true
+timeline.overwrite = true
 dag.enabled = true
 dag.overwrite = true
 
@@ -10,6 +12,12 @@ dag.overwrite = true
 params.max_memory = 128.GB
 params.max_cpus = 16
 params.max_time = 240.h
+
+// Default parameters for aggregate_emseq process
+params.path_to_ngs_agg = ""
+params.revision = ""
+params.lane = "default"
+params.sample = "default"
 
 // Dynamic resource configuration moved to base.config
 

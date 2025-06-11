@@ -95,9 +95,10 @@ process insert_size_metrics {
 
     script:
     """
-    # Use temporary files instead of named pipes for better compatibility with macOS
-    good_mapq_file=\$(mktemp good_mapq.XXXXXX.bam)
-    bad_mapq_file=\$(mktemp bad_mapq.XXXXXX.bam)
+    # Use temporary files instead of named pipes for cross-platform compatibility (Linux and macOS)
+    # mktemp works differently on Linux and macOS, so we use a more compatible approach
+    good_mapq_file="good_mapq_\$RANDOM.bam"
+    bad_mapq_file="bad_mapq_\$RANDOM.bam"
     trap "rm -f \$good_mapq_file \$bad_mapq_file" EXIT # cleanup upon exit
 
     # Split BAM file into high and low mapping quality reads
@@ -200,6 +201,7 @@ process tasmanian {
     """
     # Skip tasmanian-mismatch due to dependency issues
     # Create an empty CSV file with header to satisfy the output requirements
+    # This is a placeholder that works on both Linux and macOS
     echo "position,reference,read,count,frequency,context" > ${library}.csv
     """
 

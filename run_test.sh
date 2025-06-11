@@ -78,8 +78,11 @@ echo "running nextflow pipeline..."
 
 genome_path=${tmp}/reference.fa
 
-pushd ${tmp}
+# Clean up any previous log file
 rm -f ${pwd}/test.log.out
+
+# Change to the tmp directory
+pushd ${tmp}
 # loop for different type of files, fastq, fastq.gz and bam
 
 echo "check if files are in here"
@@ -96,10 +99,10 @@ function test_pipeline {
         --email "eng.ibrahimkamel@gmail.com" \
         --max_input_reads 10000 \
         --flowcell "test_pipeline" \
-        -with-report  "emseq_metadata_report.html" \
-        -with-timeline "emseq_metadata_timeline.html" \
-        -with-dag "emseq_metadata_dag.html" \
-        -w "${tmp}/work" \
+        -with-report  "${pwd}/test_data/tmp/emseq_metadata_report.html" \
+        -with-timeline "${pwd}/test_data/tmp/emseq_metadata_timeline.html" \
+        -with-dag "${pwd}/test_data/tmp/emseq_metadata_dag.html" \
+        -w "${pwd}/test_data/tmp/work" \
         --read_length 151 \
         --enable_neb_agg "false" 2>&1 >> ${pwd}/test.log.out
 
@@ -114,9 +117,9 @@ function test_pipeline {
 
         # Check results
         echo "checking results..."
-        cat em-seq_output/stats/flagstats/emseq-testg.flagstat |\
+        cat ${pwd}/test_data/tmp/em-seq_output/stats/flagstats/emseq-testg.flagstat |\
             grep -q "1972 + 0 properly paired" && echo "flagstats OK" >> ${pwd}/test.log.out || echo "flagstats not OK" >> ${pwd}/test.log.out
-        tail -n2 em-seq_output/stats/picard_alignment_metrics/emseq-testg.alignment_summary_metrics.txt |\
+        tail -n2 ${pwd}/test_data/tmp/em-seq_output/stats/picard_alignment_metrics/emseq-testg.alignment_summary_metrics.txt |\
             awk 'BEGIN{result="alignment metrics not OK"}{if ($1==150 && $3>2200) {result="alignment metrics OK"}}END{print result}' >> ${pwd}/test.log.out
 }
 
@@ -124,8 +127,14 @@ test_pipeline "emseq-test*1.fastq.gz"
 test_pipeline "emseq-test*1.fastq"
 test_pipeline "emseq-test*bam"
 
+# Return to the original directory
+popd
 
-# rm -r ${tmp}
+## Clean up the tmp directory to avoid conflicts with previous runs
+#if [ -d "${tmp}" ]; then
+#    echo "Cleaning up existing tmp directory..."
+#    rm -rf "${tmp}"
+#fi
 
 cat ${pwd}/test.log.out
 echo "FINISHED"

@@ -89,7 +89,9 @@ process aggregate_emseq {
     fi
 
     # Validate barcodes
-    if [[ ! ${barcodes} =~ ^[+-ACGT]+\$ ]]; then
+    # Remove square brackets for validation
+    barcode_content=\$(echo ${barcodes} | tr -d "[]")
+    if [[ ! \$barcode_content =~ ^[A-Z+\\-]+\$ ]]; then
         echo "Warning: Invalid barcode format: ${barcodes}" >&2
     fi
 
@@ -99,28 +101,35 @@ process aggregate_emseq {
 
     metadata=\$(echo "${fq_or_bam}" | awk '{if (\$1~/fastq/) {metad="fq"} else if (\$1~/bam/) {metad="_bam"}; print "--metadata"metad"_file "\$1}')
 
-    export RBENV_VERSION=\$(cat \${path_to_ngs_agg}/.ruby-version)
-    RAILS_ENV=production \${path_to_ngs_agg}/bin/bundle exec \${path_to_ngs_agg}/aggregate_results.rb \
-    --bam ${bam} \
-    --bai ${bai} \
-    --name ${library} \
-    --barcode1 \${bc} \
-    --lane ${params.lane} \
-    --contact_email ${params.email} \
-    --project ${params.project} \
-    --sample ${params.sample} \
-    --genome \$(basename ${params.path_to_genome_fasta}) \
-    --gc ${gc_metrics} \
-    --idx_stats ${idxstat} \
-    --flagstat ${flagstat} \
-    --nonconverted_read_counts ${library}.nonconverted_counts.for_agg.tsv \
-    --combined_mbias_records ${mbias} \
-    --fastqc *_fastqc/fastqc_data.txt \
-    --insert ${insertsize_metrics} \
-    --tasmanian ${tasmanian} \
-    --aln ${alignment_summary_metrics_txt} \
-    --fastp ${fastp} \
-    \${metadata}  \
-    --workflow ${params.workflow} 2> ngs_agg.${library}.err 1> ngs_agg.${library}.out
+    # Check if path_to_ngs_agg is provided and exists
+    if [ -n "${params.path_to_ngs_agg}" ] && [ -f "\${path_to_ngs_agg}/.ruby-version" ]; then
+        export RBENV_VERSION=\$(cat \${path_to_ngs_agg}/.ruby-version)
+        RAILS_ENV=production \${path_to_ngs_agg}/bin/bundle exec \${path_to_ngs_agg}/aggregate_results.rb \
+        --bam ${bam} \
+        --bai ${bai} \
+        --name ${library} \
+        --barcode1 \${bc} \
+        --lane ${params.lane} \
+        --contact_email ${params.email} \
+        --project ${params.project} \
+        --sample ${params.sample} \
+        --genome \$(basename ${params.path_to_genome_fasta}) \
+        --gc ${gc_metrics} \
+        --idx_stats ${idxstat} \
+        --flagstat ${flagstat} \
+        --nonconverted_read_counts ${library}.nonconverted_counts.for_agg.tsv \
+        --combined_mbias_records ${mbias} \
+        --fastqc *_fastqc/fastqc_data.txt \
+        --insert ${insertsize_metrics} \
+        --tasmanian ${tasmanian} \
+        --aln ${alignment_summary_metrics_txt} \
+        --fastp ${fastp} \
+        \${metadata}  \
+        --workflow ${params.workflow} 2> ngs_agg.${library}.err 1> ngs_agg.${library}.out
+    else
+        echo "Skipping aggregate_emseq: path_to_ngs_agg not provided or .ruby-version file not found" > ngs_agg.${library}.out
+        echo "This is expected if you're not using the NEB aggregation service" >> ngs_agg.${library}.out
+        touch ngs_agg.${library}.err
+    fi
     """
 }

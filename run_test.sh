@@ -93,7 +93,7 @@ function test_pipeline {
     nextflow run ${pwd}/main.nf \
         --input_glob "${file}" \
         --path_to_genome_fasta ${genome_path} \
-        --email "aerijman@neb.com" \
+        --email "eng.ibrahimkamel@gmail.com" \
         --max_input_reads 10000 \
         --flowcell "test_pipeline" \
         -with-report  "emseq_metadata_report.html" \

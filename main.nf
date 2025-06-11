@@ -61,7 +61,7 @@ workflow {
         // create the FILE here so it actually exists (touch)
         //touchFile("${workflow.workDir}/placeholder.r2.fastq")
         placeholder_r2 = file("${workflow.workDir}/placeholder.r2.fastq")
-        
+
         // if reference is not indexed, index it.
         if (!file(params.path_to_genome_fasta).exists()) {
             println "Workflow failed: Genome file does not exist."
@@ -88,7 +88,7 @@ workflow {
             return [params.email, library, read1File, read2File, fileType]
           }
           //.join(genome_index_ch)
-        
+
 
         reads.view()
 
@@ -104,7 +104,7 @@ workflow {
                        .map { tuple -> tuple[0..4] }
         failed_reads = checking_reads.filter { tuple -> tuple[5].text.contains('fail') }.map { tuple -> tuple[5].text }
         send_email( failed_reads.collect() )
-        
+
 
         // align and mark duplicates
         alignedReads = alignReads( passed_reads, genome_index_ch )
@@ -139,7 +139,7 @@ workflow {
         if (params.enable_neb_agg.toString().toUpperCase() == "TRUE") {
             aggregate_emseq( grouped_email_library ) 
         }
-       
+
         // channel for multiqc analysis
         all_results = grouped_email_library
          .join(insertsize.high_mapq_insert_size_metrics.groupTuple(by: [0, 1]), by: [0, 1])
@@ -147,7 +147,7 @@ workflow {
          .groupTuple()
          .flatten()
          .toList()
-         .map { items -> [items[0], items[7..-1]] }
+         .map { items -> items.size() >= 8 ? [items[0], items[7..-1]] : [items[0], []] }
 
         multiqc( all_results )
 }

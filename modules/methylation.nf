@@ -1,5 +1,4 @@
 
-
 process methylDackel_mbias {
     label 'medium_cpu'
     errorStrategy 'retry'
@@ -47,10 +46,10 @@ process methylDackel_mbias {
     done
     # makes the svg files for trimming checks
     MethylDackel mbias -@ ${task.cpus} --noCpG --CHH --CHG -r \${chrs[0]} \${genome} ${md_bam} ${library}_chn
-    for f in *chn*.svg; do sed -i "s/Strand<\\/text>/Strand \$f \${chrs[0]} CHN <\\/text>/" \$f; done;
+    for f in *chn*.svg; do sed -i '' "s/Strand<\\/text>/Strand \$f \${chrs[0]} CHN <\\/text>/" \$f; done;
 
     MethylDackel mbias -@ ${task.cpus} -r \${chrs[0]} \${genome} ${md_bam} ${library}_cpg
-    for f in *cpg*.svg; do sed -i "s/Strand<\\/text>/Strand \$f \${chrs[0]} CpG<\\/text>/" \$f; done;
+    for f in *cpg*.svg; do sed -i '' "s/Strand<\\/text>/Strand \$f \${chrs[0]} CpG<\\/text>/" \$f; done;
     """
 }
 

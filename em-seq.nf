@@ -4,7 +4,7 @@
 
 flowcell = params.flowcell
 genome = params.genome
-params.tmp_dir = '/tmp'
+params.tmp_dir = System.getProperty('java.io.tmpdir')
 outputPath = params.outdir = 'output'
 fastq_mode = params.fastq_mode = 'run_fastqs'
 println "Processing " + flowcell + "... => " + outputPath
@@ -19,7 +19,7 @@ Channel.fromFilePairs(fastq_glob)
                        lane:'all', 
                        tile:'all' ]
     }.set{fq_set_channel}
-    
+
 process mapping {
     cpus fastq_mode == 'tile-fastq' ? 4 : 16
     errorStrategy 'retry'
@@ -89,7 +89,7 @@ process mergeAndMarkDuplicates {
                     md_files_for_goleft; md_files_for_picard_gc; md_files_for_samflagstats; 
                     md_files_for_aggregate; md_files_for_human_reads;
                  }
-                 
+
 
     process methylDackel_mbias {
         cpus 8
@@ -135,10 +135,24 @@ process mergeAndMarkDuplicates {
         done
         # makes the svg files for trimming checks
         MethylDackel mbias -@ !{task.cpus} --noCpG --CHH --CHG -r ${chrs[0]} !{genome} !{md_file} !{library}_chn
-        for f in *chn*.svg; do sed -i "s/Strand<\\/text>/Strand $f ${chrs[0]} CHN <\\/text>/" $f; done;
+        # Check OS type and use appropriate sed syntax
+        if [[ "$(uname)" == "Darwin" ]]; then
+            # macOS
+            for f in *chn*.svg; do sed -i '' "s/Strand<\\/text>/Strand $f ${chrs[0]} CHN <\\/text>/" $f; done;
+        else
+            # Linux and other Unix-like systems
+            for f in *chn*.svg; do sed -i "s/Strand<\\/text>/Strand $f ${chrs[0]} CHN <\\/text>/" $f; done;
+        fi
 
         MethylDackel mbias -@ !{task.cpus} -r ${chrs[0]} !{genome} !{md_file} !{library}_cpg
-        for f in *cpg*.svg; do sed -i "s/Strand<\\/text>/Strand $f ${chrs[0]} CpG<\\/text>/" $f; done;
+        # Check OS type and use appropriate sed syntax
+        if [[ "$(uname)" == "Darwin" ]]; then
+            # macOS
+            for f in *cpg*.svg; do sed -i '' "s/Strand<\\/text>/Strand $f ${chrs[0]} CpG<\\/text>/" $f; done;
+        else
+            # Linux and other Unix-like systems
+            for f in *cpg*.svg; do sed -i "s/Strand<\\/text>/Strand $f ${chrs[0]} CpG<\\/text>/" $f; done;
+        fi
 
         '''
 
@@ -261,7 +275,7 @@ process mergeAndMarkDuplicates {
             file('*.idxstat') into idxstats
             tuple library, file('*.flagstat') into flagstats_for_aggregate
             tuple library, file('*.idxstat') into idxstats_for_aggregate
-            
+
 
         shell:
         '''
@@ -485,4 +499,3 @@ process mergeAndMarkDuplicates {
         gs -dBATCH -dNOPAUSE -q -sDEVICE=pdfwrite -sOutputFile=combined-mbias.pdf *.pdf
         '''
     }
-

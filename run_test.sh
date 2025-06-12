@@ -32,14 +32,39 @@ tmp="${pwd}/test_data/tmp"
 [ -d "${tmp}" ] || mkdir -p "${tmp}"
 
 # First ensure both paths are absolute
-src_dir=$(realpath "${pwd}/test_data")
-dst_dir=$(realpath "${tmp}")
+# Define a portable realpath function
+portable_realpath() {
+    # Try to use readlink -f if available (Linux)
+    if command -v readlink >/dev/null 2>&1 && readlink -f / >/dev/null 2>&1; then
+        readlink -f "$1"
+    # Try to use realpath if available
+    elif command -v realpath >/dev/null 2>&1; then
+        realpath "$1"
+    # Fallback to a basic implementation using cd and pwd
+    else
+        local path="$1"
+        local dir
+        if [ -d "$path" ]; then
+            dir="$path"
+        else
+            dir=$(dirname "$path")
+        fi
+        local base=""
+        if [ ! -d "$path" ]; then
+            base="/$(basename "$path")"
+        fi
+        echo "$(cd "$dir" && pwd)$base"
+    fi
+}
+
+src_dir=$(portable_realpath "${pwd}/test_data")
+dst_dir=$(portable_realpath "${tmp}")
 
 # For fastq files
 for file in "${src_dir}"/emseq-test*.fastq.gz; do
-    src_file=$(realpath "${file}")
+    src_file=$(portable_realpath "${file}")
     dst_file="${dst_dir}/$(basename "${file}")"
-    if [ "${src_file}" != "$(realpath -m "${dst_file}")" ]; then
+    if [ "${src_file}" != "$(portable_realpath "${dst_file}")" ]; then
         cp -f "${src_file}" "${dst_dir}/"
     else
         echo "Warning: Source and destination are the same file: ${file}"
@@ -47,9 +72,9 @@ for file in "${src_dir}"/emseq-test*.fastq.gz; do
 done
 
 # For reference file
-src_ref=$(realpath "${src_dir}/reference.fa")
+src_ref=$(portable_realpath "${src_dir}/reference.fa")
 dst_ref="${dst_dir}/reference.fa"
-if [ "${src_ref}" != "$(realpath -m "${dst_ref}")" ]; then
+if [ "${src_ref}" != "$(portable_realpath "${dst_ref}")" ]; then
     cp -f "${src_ref}" "${dst_dir}/"
 else
     echo "Warning: Source and destination are the same file: reference.fa"

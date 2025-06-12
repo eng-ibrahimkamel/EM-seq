@@ -15,15 +15,35 @@ process enough_reads {
 
         script:
         """
-        in1=\$(realpath ${input_file1})
+        # Use readlink -f as a more portable alternative to realpath
+        # If readlink -f is not available, fallback to using the input file directly
+        if command -v readlink >/dev/null 2>&1 && readlink -f / >/dev/null 2>&1; then
+            in1=\$(readlink -f ${input_file1})
+        else
+            in1="${input_file1}"
+        fi
+
         passes_or_fails="pass"
 
+        # Check if we're on macOS (BSD) or Linux (GNU)
+        if [ "\$(uname)" == "Darwin" ]; then
+            # macOS (BSD stat)
+            get_file_size() {
+                stat -f%z "\$1"
+            }
+        else
+            # Linux (GNU stat)
+            get_file_size() {
+                stat -c%s "\$1"
+            }
+        fi
+
         if grep -q "fastq.gz" <<< "${fileType}"; then
-            [ \$(stat -c%s \${in1}) -lt 54 ] && passes_or_fails="fail"
+            [ \$(get_file_size "\${in1}") -lt 54 ] && passes_or_fails="fail"
         elif grep -q "fastq" <<< "${fileType}"; then 
-            [ \$(stat -c%s \${in1}) -lt 240 ] && passes_or_fails="fail"
+            [ \$(get_file_size "\${in1}") -lt 240 ] && passes_or_fails="fail"
         elif grep -q "bam" <<< "${fileType}"; then
-            [ \$(stat -c%s \${in1}) -lt 100 ] && passes_or_fails="fail"
+            [ \$(get_file_size "\${in1}") -lt 100 ] && passes_or_fails="fail"
         fi 
 
         echo -e "$library\\t\${passes_or_fails}" > ${library}_passes_or_fails.txt

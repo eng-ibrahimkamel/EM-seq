@@ -38,9 +38,16 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
         log_info "Detected macOS on Intel (x86_64)"
     fi
 else
-    # Linux and others (default to Linux x86_64)
-    MINICONDA_URL="${MINICONDA_URL_LINUX_X86_64}"
-    log_info "Detected Linux or other OS (assuming x86_64)"
+    # Linux and others
+    if [[ $(uname -m) == "aarch64" || $(uname -m) == "arm64" ]]; then
+        # ARM64 architecture
+        MINICONDA_URL="${MINICONDA_URL_LINUX_ARM64}"
+        log_info "Detected Linux on ARM64 architecture"
+    else
+        # Default to x86_64
+        MINICONDA_URL="${MINICONDA_URL_LINUX_X86_64}"
+        log_info "Detected Linux on x86_64 architecture"
+    fi
 fi
 
 # Download Miniconda3 installer with progress bar

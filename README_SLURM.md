@@ -63,6 +63,7 @@ nextflow run main.nf -profile slurm [other parameters]
 The Docker-based Slurm cluster provided with this repository has very limited resources:
 
 - Each node has only 1000 MB (1 GB) of memory (`RealMemory=1000` in slurm.conf)
+- Each node has only 1 CPU available (not explicitly defined in slurm.conf, so defaults to 1)
 - The default memory per CPU is 500 MB (`DefMemPerCPU=500` in slurm.conf)
 - There are only 2 compute nodes available (`c[1-2]` in slurm.conf)
 
@@ -84,5 +85,6 @@ If you encounter issues:
 4. Review Slurm job logs in the output directory
 5. Ensure that the Slurm daemons are running properly
 6. If you see "Memory specification can not be satisfied" errors, check the memory limits in your Slurm cluster and adjust the memory settings in `nextflow.config` accordingly
+7. If you see "CPU count per node can not be satisfied" errors, check the CPU limits in your Slurm cluster and adjust the CPU settings in `nextflow.config` accordingly. For the Docker-based Slurm cluster, each node has only 1 CPU available.
 
 For Docker-based Slurm, see the documentation in the `slurm-docker-cluster` directory.

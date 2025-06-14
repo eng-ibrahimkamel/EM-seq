@@ -151,9 +151,13 @@ process alignReads {
     println "Task memory set to ${task.memory} (SLURM mode: ${slurm_profile})"
 
     // Define sambamba_memory here, outside the bash script, respecting resource constraints
+    // Ensure consistent types for Math operations
+    def memToGigaDouble = task.memory.toGiga().doubleValue()
+    def memThreeQuarters = (memToGigaDouble * 3 / 4).doubleValue()
+
     def sambamba_memory = slurm_profile ? 
-        "${Math.min(0.7, (task.memory.toGiga()*3).intdiv(4))}GB" : // For SLURM, limit to 700MB max
-        "${Math.max(4, (task.memory.toGiga()*3).intdiv(4))}GB"     // For non-SLURM, minimum 4GB
+        "${Math.min(0.7d, memThreeQuarters)}GB" : // For SLURM, limit to 700MB max
+        "${Math.max(4.0d, memThreeQuarters)}GB"   // For non-SLURM, minimum 4GB
 
     """
 
@@ -319,9 +323,12 @@ process alignReads {
 
     # Break the pipeline into smaller steps to isolate issues
     # Step 1: Process reads and align
+    # Calculate threads for bwameth ensuring consistent types
+    def bwamethThreads = Math.max(1, (task.cpus.intValue() * 7 / 8).intValue())
+
     eval \${stream_reads} \${bam2fastq} \
     | fastp --stdin --stdout -l 2 -Q \${trim_polyg} --interleaved_in --overrepresentation_analysis -j "\${base_outputname}.fastp.json" 2> fastp.stderr \
-    | bwameth.py -p -t ${Math.max(1,(task.cpus*7).intdiv(8))} --read-group "\${rg_line}" --reference \${genome} /dev/stdin 2> "\${base_outputname}.log.bwamem" > "\${base_outputname}.sam"
+    | bwameth.py -p -t ${bwamethThreads} --read-group "\${rg_line}" --reference \${genome} /dev/stdin 2> "\${base_outputname}.log.bwamem" > "\${base_outputname}.sam"
 
     # Check exit status of the bwameth.py command
     bwameth_exit=\$?
@@ -359,8 +366,11 @@ process alignReads {
         mem_value_mb=\$(echo "\${mem_value}" | cut -d'.' -f1)
     fi
 
+    # Calculate threads for samtools sort ensuring consistent types
+    def sortThreads = Math.max(1, (task.cpus.intValue() / 4).intValue())
+
     # Calculate memory per thread (75% of total divided by thread count)
-    threads=${Math.max(1,task.cpus.intdiv(4))}
+    threads=${sortThreads}
     mem_per_thread=\$(( (mem_value_mb * 75 / 100) / threads ))
 
     # Ensure minimum of 100M per thread
@@ -373,7 +383,7 @@ process alignReads {
     echo "Memory per thread for samtools sort: \$sort_mem_per_thread"
 
     samtools view -u "\${base_outputname}.reheadered.sam" | \
-    samtools sort -m \$sort_mem_per_thread -@ ${Math.max(1,task.cpus.intdiv(4))} -T ${params.tmp_dir}/tmp -o "\${base_outputname}.aln.bam" -
+    samtools sort -m \$sort_mem_per_thread -@ ${sortThreads} -T ${params.tmp_dir}/tmp -o "\${base_outputname}.aln.bam" -
 
     # Index the BAM file
     samtools index "\${base_outputname}.aln.bam"
@@ -408,6 +418,9 @@ process mergeAndMarkDuplicates {
         path('*.markdups_log'), emit: log_files
 
     script:
+    // Calculate picard memory ensuring consistent types
+    def picardMemGB = Math.max(1, task.memory.toGiga().intValue())
+
     """
     set +o pipefail
     inst_name=\$(samtools view ${bam} | head -n1 | cut -d ":" -f1);
@@ -415,7 +428,7 @@ process mergeAndMarkDuplicates {
 
     optical_distance=\$(echo \${inst_name} | awk '{if (\$1~/^M0|^NS|^NB/) {print 100} else {print 2500}}')
 
-    picard -Xmx${Math.max(1, task.memory.toGiga())}g MarkDuplicates \
+    picard -Xmx${picardMemGB}g MarkDuplicates \
         --TAGGING_POLICY All \
         --OPTICAL_DUPLICATE_PIXEL_DISTANCE \${optical_distance} \
         --TMP_DIR ${params.tmp_dir} \

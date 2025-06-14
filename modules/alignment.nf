@@ -104,9 +104,9 @@ process alignReads {
         // Skip procps-ng on macOS as it's not available
         def os = System.getProperty("os.name").toLowerCase()
         if (os.contains("mac") || os.contains("darwin")) {
-            "conda-forge::python=3.10 bioconda::bwameth=0.2.7 bioconda::fastp=0.23.4 bioconda::mark-nonconverted-reads=1.2 bioconda::sambamba=1.0 bioconda::samtools=1.21 bioconda::seqtk=1.4 bioconda::pysam"  // Skip procps-ng for macOS
+            "conda-forge::python=3.10 bioconda::bwameth=0.2.7 bioconda::fastp=0.23.4 bioconda::mark-nonconverted-reads=1.2 bioconda::sambamba=1.0 bioconda::samtools=1.21 bioconda::seqtk=1.4 bioconda::pysam conda-forge::bc"  // Skip procps-ng for macOS
         } else {
-            "conda-forge::python=3.10 bioconda::bwameth=0.2.7 bioconda::fastp=0.23.4 bioconda::mark-nonconverted-reads=1.2 bioconda::sambamba=1.0 bioconda::samtools=1.21 bioconda::seqtk=1.4 bioconda::pysam conda-forge::procps-ng"  // Include procps-ng for Linux
+            "conda-forge::python=3.10 bioconda::bwameth=0.2.7 bioconda::fastp=0.23.4 bioconda::mark-nonconverted-reads=1.2 bioconda::sambamba=1.0 bioconda::samtools=1.21 bioconda::seqtk=1.4 bioconda::pysam conda-forge::procps-ng conda-forge::bc"  // Include procps-ng for Linux
         }
     }
     publishDir "${params.outputDir}/bwameth_align"
@@ -334,27 +334,35 @@ process alignReads {
 
     # Step 4: Convert to BAM and sort using samtools instead of sambamba
     # Calculate memory limit for samtools sort based on available memory
-    sort_mem_per_thread=\$(echo "${task.memory}" | awk '{
-        # Extract numeric part and unit
-        match(\$0, /([0-9.]+)[ ]*([A-Za-z]+)/, arr)
-        value = arr[1]
-        unit = arr[2]
+    # Use a simpler approach to avoid AWK escaping issues
+    mem_value=\$(echo "${task.memory}" | sed -E 's/([0-9.]+).*/\\1/')
+    mem_unit=\$(echo "${task.memory}" | sed -E 's/[0-9.]+ *([A-Za-z]+).*/\\1/')
 
-        # Convert to MB based on unit
-        if (unit ~ /^[Gg][Bb]?\$/) {
-            value = value * 1024  # Convert GB to MB
-        } else if (unit ~ /^[Kk][Bb]?\$/) {
-            value = value / 1024  # Convert KB to MB
-        }
+    # Convert to MB based on unit (using bc for more reliable arithmetic)
+    if [[ "\${mem_unit}" == "GB" || "\${mem_unit}" == "gb" || "\${mem_unit}" == "G" || "\${mem_unit}" == "g" ]]; then
+        # Convert GB to MB (multiply by 1024)
+        mem_value_mb=\$(echo "\${mem_value} * 1024" | bc | cut -d'.' -f1)
+    elif [[ "\${mem_unit}" == "KB" || "\${mem_unit}" == "kb" || "\${mem_unit}" == "K" || "\${mem_unit}" == "k" ]]; then
+        # Convert KB to MB (divide by 1024)
+        mem_value_mb=1  # Default to 1 MB if less than 1 MB
+        if (( \$(echo "\${mem_value} > 1024" | bc) )); then
+            mem_value_mb=\$(echo "\${mem_value} / 1024" | bc | cut -d'.' -f1)
+        fi
+    else
+        # Assume already in MB
+        mem_value_mb=\$(echo "\${mem_value}" | cut -d'.' -f1)
+    fi
 
-        # Calculate memory per thread (75% of total divided by thread count)
-        mem_per_thread = int((value * 0.75) / '${Math.max(1,task.cpus.intdiv(4))}')
+    # Calculate memory per thread (75% of total divided by thread count)
+    threads=${Math.max(1,task.cpus.intdiv(4))}
+    mem_per_thread=\$(( (mem_value_mb * 75 / 100) / threads ))
 
-        # Ensure minimum of 100M per thread
-        if (mem_per_thread < 100) mem_per_thread = 100
+    # Ensure minimum of 100M per thread
+    if [ \${mem_per_thread} -lt 100 ]; then
+        mem_per_thread=100
+    fi
 
-        print mem_per_thread "M"
-    }')
+    sort_mem_per_thread="\${mem_per_thread}M"
 
     echo "Memory per thread for samtools sort: \$sort_mem_per_thread"
 

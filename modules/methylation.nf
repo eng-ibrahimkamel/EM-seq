@@ -137,6 +137,9 @@ process methylDackel_extract {
         Math.max(2, Math.min(8, Math.ceil(fileSizeGB * 2)))
     )
 
+    // Convert cpusToUse to integer for pigz
+    def cpusToUseInt = cpusToUse.intValue()
+
     task.memory = "${memoryGB} GB"
 
     """
@@ -145,8 +148,8 @@ process methylDackel_extract {
     echo "CPUs allocated: ${cpusToUse}"
 
     genome=\$(ls *fa)
-    MethylDackel extract --methylKit -q 20 --nOT 0,0,0,5 --nOB 0,0,5,0 -@ ${cpusToUse} \
+    MethylDackel extract --methylKit -q 20 -@ ${cpusToUseInt} \
         --CHH --CHG -o ${library}.${barcodes} \${genome} ${md_bam} 
-    pigz -p ${cpusToUse} *.methylKit 
+    pigz -p ${cpusToUseInt} *.methylKit 
     """
 }

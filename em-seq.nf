@@ -172,8 +172,11 @@ process mergeAndMarkDuplicates {
 
         shell:
         '''
-        MethylDackel extract --methylKit --nOT 0,0,0,5 --nOB 0,0,5,0 -@ !{task.cpus} --CHH --CHG -o !{library} !{genome} !{md_file}
-        pigz -p !{task.cpus} *.methylKit
+        # Convert task.cpus to integer for pigz
+        cpus_int=$(printf "%.0f" !{task.cpus})
+
+        MethylDackel extract --methylKit -@ $cpus_int --CHH --CHG -o !{library} !{genome} !{md_file}
+        pigz -p $cpus_int *.methylKit
         '''
 
     }

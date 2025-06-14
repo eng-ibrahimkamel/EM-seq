@@ -136,9 +136,15 @@ process alignReads {
     def minMemoryGB = slurm_profile ? 0.8 : 7 // Use 800MB for SLURM, 7GB otherwise
 
     // Calculate memory based on file size but respect limits
+    // Ensure all values are explicitly converted to double to avoid type ambiguity
+    def maxMemoryGB = params.max_memory.toGiga().doubleValue()
+    def currentMemGB = currentMemoryGB.doubleValue()
+    def minMemGB = minMemoryGB.doubleValue()
+    def fileBasedMemGB = Math.ceil(fileSizeGB * 1.5).doubleValue()
+
     def memoryGB = Math.min(
-        params.max_memory.toGiga(),
-        Math.max(Math.max(currentMemoryGB, minMemoryGB), Math.ceil(fileSizeGB * 1.5))
+        maxMemoryGB,
+        Math.max(Math.max(currentMemGB, minMemGB), fileBasedMemGB)
     )
 
     task.memory = "${memoryGB} GB"

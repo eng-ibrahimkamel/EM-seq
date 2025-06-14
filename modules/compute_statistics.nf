@@ -20,14 +20,34 @@ process gc_bias {
         tuple val(params.email), val(library), path('*gc_metrics'), emit: for_agg
 
     script:
+    // Set memory based on BAM file size - Picard is memory-intensive
+    def fileSizeGB = bam.size() / (1024 * 1024 * 1024) // Convert bytes to GB
+    def currentMemoryGB = task.memory.toGiga() // Convert task.memory to GB
+
+    // Picard needs more memory for larger files
+    // Scale memory with file size but ensure minimum and respect maximum
+    def memoryGB = Math.min(
+        params.max_memory.toGiga(),
+        Math.max(Math.max(currentMemoryGB, 2), Math.ceil(fileSizeGB * 1.5))
+    )
+
+    // Calculate Xmx value for Picard (slightly less than total memory)
+    def picardXmx = Math.max(1, (memoryGB * 0.8).intValue())
+
+    task.memory = "${memoryGB} GB"
+
     """
+    echo "Input BAM size: ${fileSizeGB} GB"
+    echo "Memory allocated for this task: ${task.memory}"
+    echo "Picard Xmx: ${picardXmx}g"
+
     genome=\$(ls *.bwameth.c2t.bwt | sed 's/.bwameth.c2t.bwt//')
     samtools view -H ${bam} | grep "^@SQ" \
     | grep -v "plasmid_puc19\\|phage_lambda\\|phage_Xp12\\|phage_T4\\|EBV\\|chrM" \
     | awk -F":|\\t" '{print \$3"\\t"0"\\t"\$5}' > include_regions.bed
 
     samtools view -h -L include_regions.bed ${bam} | \
-    picard -Xmx${Math.max(1, task.memory.toGiga())}g CollectGcBiasMetrics \
+    picard -Xmx${picardXmx}g CollectGcBiasMetrics \
         --IS_BISULFITE_SEQUENCED true --VALIDATION_STRINGENCY SILENT \
         -I /dev/stdin -O ${library}.gc_metrics -S ${library}.gc_summary_metrics \
         --CHART ${library}.gc.pdf -R \${genome}
@@ -134,7 +154,28 @@ process insert_size_metrics {
         tuple val(params.email), val(library), path('*good_mapq.insert_size_metrics.txt'), emit: high_mapq_insert_size_metrics
 
     script:
+    // Set memory based on BAM file size - Picard is memory-intensive
+    def fileSizeGB = bam.size() / (1024 * 1024 * 1024) // Convert bytes to GB
+    def currentMemoryGB = task.memory.toGiga() // Convert task.memory to GB
+
+    // Picard needs more memory for larger files
+    // Scale memory with file size but ensure minimum and respect maximum
+    def memoryGB = Math.min(
+        params.max_memory.toGiga(),
+        Math.max(Math.max(currentMemoryGB, 2), Math.ceil(fileSizeGB * 1.2))
+    )
+
+    // Calculate Xmx value for Picard (slightly less than total memory)
+    // We need to run Picard twice, so allocate less memory per run
+    def picardXmx = Math.max(1, (memoryGB * 0.4).intValue())
+
+    task.memory = "${memoryGB} GB"
+
     """
+    echo "Input BAM size: ${fileSizeGB} GB"
+    echo "Memory allocated for this task: ${task.memory}"
+    echo "Picard Xmx per run: ${picardXmx}g"
+
     # Use temporary files instead of named pipes for cross-platform compatibility (Linux and macOS)
     # mktemp works differently on Linux and macOS, so we use a more compatible approach
     good_mapq_file="good_mapq_\$RANDOM.bam"
@@ -147,12 +188,12 @@ process insert_size_metrics {
     samtools view -h ${bam} | awk 'substr(\$0,1,1)=="@" || (\$5<20 && \$5>=0)' | samtools view -b > "\$bad_mapq_file"
 
     # Run Picard on high mapping quality reads
-    picard -Xmx${Math.max(1, task.memory.toGiga())}g CollectInsertSizeMetrics \
+    picard -Xmx${picardXmx}g CollectInsertSizeMetrics \
         --INCLUDE_DUPLICATES --VALIDATION_STRINGENCY SILENT -I "\$good_mapq_file" -O good_mapq.out.txt \
         --MINIMUM_PCT 0 -H /dev/null
 
     # Run Picard on low mapping quality reads
-    picard -Xmx${Math.max(1, task.memory.toGiga())}g CollectInsertSizeMetrics \
+    picard -Xmx${picardXmx}g CollectInsertSizeMetrics \
         --INCLUDE_DUPLICATES --VALIDATION_STRINGENCY SILENT -I "\$bad_mapq_file" -O bad_mapq.out.txt \
         --MINIMUM_PCT 0 -H /dev/null
 
@@ -225,9 +266,29 @@ process picard_metrics {
         tuple val(params.email), val(library), path('*alignment_summary_metrics.txt'), emit: for_agg
 
     script:
+    // Set memory based on BAM file size - Picard is memory-intensive
+    def fileSizeGB = bam.size() / (1024 * 1024 * 1024) // Convert bytes to GB
+    def currentMemoryGB = task.memory.toGiga() // Convert task.memory to GB
+
+    // Picard needs more memory for larger files
+    // Scale memory with file size but ensure minimum and respect maximum
+    def memoryGB = Math.min(
+        params.max_memory.toGiga(),
+        Math.max(Math.max(currentMemoryGB, 2), Math.ceil(fileSizeGB * 1.2))
+    )
+
+    // Calculate Xmx value for Picard (slightly less than total memory)
+    def picardXmx = Math.max(1, (memoryGB * 0.8).intValue())
+
+    task.memory = "${memoryGB} GB"
+
     """
+    echo "Input BAM size: ${fileSizeGB} GB"
+    echo "Memory allocated for this task: ${task.memory}"
+    echo "Picard Xmx: ${picardXmx}g"
+
     genome=\$(ls *.fa 2>/dev/null || ls *.fasta 2>/dev/null)
-    picard -Xmx${Math.max(1, task.memory.toGiga())}g CollectAlignmentSummaryMetrics \
+    picard -Xmx${picardXmx}g CollectAlignmentSummaryMetrics \
         --VALIDATION_STRINGENCY SILENT -BS true -R \${genome} \
         -I ${bam} -O ${library}.alignment_summary_metrics.txt
     """

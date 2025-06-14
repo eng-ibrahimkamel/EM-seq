@@ -318,11 +318,11 @@ process alignReads {
     | bwameth.py -p -t ${Math.max(1,(task.cpus*7).intdiv(8))} --read-group "\${rg_line}" --reference \${genome} /dev/stdin 2> "\${base_outputname}.log.bwamem" > "\${base_outputname}.sam"
 
     # Check exit status of the bwameth.py command
-    bwameth_exit=$?
-    if [ $bwameth_exit -ne 0 ]; then
-        echo "BWA-MEM alignment failed with exit code $bwameth_exit"
+    bwameth_exit=\$?
+    if [ \$bwameth_exit -ne 0 ]; then
+        echo "BWA-MEM alignment failed with exit code \$bwameth_exit"
         echo "This might be due to memory constraints. Check the log file for details."
-        exit $bwameth_exit
+        exit \$bwameth_exit
     fi
 
     # Step 2: Reheader the SAM file

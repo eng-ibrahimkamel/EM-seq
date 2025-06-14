@@ -106,7 +106,8 @@ process alignReads {
     // Set memory, dynamically, based on input file size
     def fileSizeGB = input_file1.size() / (1024 * 1024 * 1024) // Convert bytes to GB
     def currentMemoryGB = task.memory.toGiga() // Convert task.memory to GB
-    def memoryGB = Math.max(Math.max(currentMemoryGB, 8), Math.ceil(fileSizeGB * 2)) // Minimum 8GB or 2x file size
+    def minMemoryGB = 7 // Reduced from 8GB to 7GB to avoid exceeding available memory
+    def memoryGB = Math.max(Math.max(currentMemoryGB, minMemoryGB), Math.ceil(fileSizeGB * 2)) // Minimum 7GB or 2x file size
     task.memory = "${memoryGB} GB"
 
     // Define sambamba_memory here, outside the bash script

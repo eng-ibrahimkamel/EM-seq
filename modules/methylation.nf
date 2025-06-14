@@ -3,7 +3,7 @@ process methylDackel_mbias {
     label 'medium_cpu'
     errorStrategy 'retry'
     tag "${library}"
-    conda "bioconda::methyldackel=0.6.1 bioconda::samtools=1.21 conda-forge::pigz=2.8"
+    conda "bioconda::methyldackel=0.6.1 bioconda::samtools=1.21 conda-forge::pigz=2.8 conda-forge::procps-ng"
     publishDir "${params.outputDir}/methylDackelExtracts/mbias"
 
     input:
@@ -72,7 +72,7 @@ process methylDackel_extract {
     label 'high_cpu'
     tag "${library}"
     publishDir "${params.outputDir}/methylDackelExtracts", mode: 'copy'
-    conda "bioconda::methyldackel=0.6.1 bioconda::samtools=1.21 conda-forge::pigz=2.8"
+    conda "bioconda::methyldackel=0.6.1 bioconda::samtools=1.21 conda-forge::pigz=2.8 conda-forge::procps-ng"
 
     input:
         tuple val(library), path(md_bam), path(md_bai), val(barcodes) 

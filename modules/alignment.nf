@@ -1,7 +1,7 @@
 process enough_reads {
     label 'low_cpu'
     tag {library}
-    conda "bioconda::samtools=1.21"
+    conda "bioconda::samtools=1.21 conda-forge::procps-ng"
 
     input:
         tuple val(email), 
@@ -52,6 +52,7 @@ process enough_reads {
 
 process send_email {
     label 'low_cpu'
+    conda "conda-forge::procps-ng"
 
     input:
         file libraries
@@ -83,7 +84,7 @@ process send_email {
 process alignReads {
     label 'high_cpu'
     tag { library }
-    conda "conda-forge::python=3.10 bioconda::bwameth=0.2.7 bioconda::fastp=0.23.4 bioconda::mark-nonconverted-reads=1.2 bioconda::sambamba=1.0 bioconda::samtools=1.21 bioconda::seqtk=1.4 bioconda::pysam"
+    conda "conda-forge::python=3.10 bioconda::bwameth=0.2.7 bioconda::fastp=0.23.4 bioconda::mark-nonconverted-reads=1.2 bioconda::sambamba=1.0 bioconda::samtools=1.21 bioconda::seqtk=1.4 bioconda::pysam conda-forge::procps-ng"
     publishDir "${params.outputDir}/bwameth_align"
 
     input:
@@ -304,7 +305,7 @@ process mergeAndMarkDuplicates {
     label 'high_cpu'
     tag { library }
     publishDir "${params.outputDir}/markduped_bams", mode: 'copy', pattern: '*.md.{bam,bai}'
-    conda "bioconda::picard=3.1 bioconda::samtools=1.21"
+    conda "bioconda::picard=3.1 bioconda::samtools=1.21 conda-forge::procps-ng"
 
     input:
         tuple val(library), path(bam), path(bai), val(barcodes) 

@@ -2,7 +2,7 @@
 
 process multiqc {
     label 'medium_cpu'
-    conda "bioconda::multiqc=1.25"
+    conda "bioconda::multiqc=1.25 conda-forge::procps-ng"
     publishDir "${params.outputDir}", mode: 'copy'
 
     input:
@@ -57,7 +57,7 @@ CONFIG
 
 process aggregate_emseq {
     tag { library }
-    conda "bioconda::samtools=1.21"
+    conda "bioconda::samtools=1.21 conda-forge::procps-ng"
     publishDir "${params.outputDir}/ngs-agg"
 
     input:         

@@ -2,7 +2,7 @@
 process gc_bias {
     label 'medium_cpu'
     tag { library }
-    conda "bioconda::picard=3.3.0 bioconda::samtools=1.21"
+    conda "bioconda::picard=3.3.0 bioconda::samtools=1.21 conda-forge::procps-ng"
     publishDir "${params.outputDir}/stats/gc_bias"
 
     input:
@@ -29,7 +29,7 @@ process gc_bias {
 process idx_stats {
     label 'medium_cpu'
     tag { library }
-    conda "bioconda::samtools=1.21"
+    conda "bioconda::samtools=1.21 conda-forge::procps-ng"
     publishDir "${params.outputDir}/stats/idxstats"
 
     input:
@@ -47,7 +47,7 @@ process idx_stats {
 process flag_stats {
     label 'medium_cpu'
     tag { library }
-    conda "bioconda::samtools=1.21"
+    conda "bioconda::samtools=1.21 conda-forge::procps-ng"
     publishDir "${params.outputDir}/stats/flagstats"
 
     input:
@@ -65,7 +65,7 @@ process flag_stats {
 process fastqc {
     label 'medium_cpu'
     tag { library }
-    conda "bioconda::fastqc=0.11.8"
+    conda "bioconda::fastqc=0.11.8 conda-forge::procps-ng"
     publishDir "${params.outputDir}/stats/fastqc"
 
     input:
@@ -83,7 +83,7 @@ process fastqc {
 process insert_size_metrics {
     label 'medium_cpu'
     tag { library }
-    conda "bioconda::picard=3.3.0 bioconda::samtools=1.21"
+    conda "bioconda::picard=3.3.0 bioconda::samtools=1.21 conda-forge::procps-ng"
     publishDir "${params.outputDir}/stats/insert_size"
 
     input:
@@ -166,7 +166,7 @@ process insert_size_metrics {
 process picard_metrics {
     label 'medium_cpu'
     tag { library }
-    conda "bioconda::picard=3.3.0 bioconda::samtools=1.21"
+    conda "bioconda::picard=3.3.0 bioconda::samtools=1.21 conda-forge::procps-ng"
     publishDir "${params.outputDir}/stats/picard_alignment_metrics"
 
     input:
@@ -188,7 +188,7 @@ process picard_metrics {
 process tasmanian {
     label 'medium_cpu'
     tag { library }
-    conda "bioconda::samtools=1.21"
+    conda "bioconda::samtools=1.21 conda-forge::procps-ng"
 
     input:
         tuple val(library), path(bam), path(bai), val(barcodes)

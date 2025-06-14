@@ -27,7 +27,7 @@ process gc_bias {
     | awk -F":|\\t" '{print \$3"\\t"0"\\t"\$5}' > include_regions.bed
 
     samtools view -h -L include_regions.bed ${bam} | \
-    picard -Xmx${task.memory.toGiga()}g CollectGcBiasMetrics \
+    picard -Xmx${Math.max(1, task.memory.toGiga())}g CollectGcBiasMetrics \
         --IS_BISULFITE_SEQUENCED true --VALIDATION_STRINGENCY SILENT \
         -I /dev/stdin -O ${library}.gc_metrics -S ${library}.gc_summary_metrics \
         --CHART ${library}.gc.pdf -R \${genome}
@@ -147,12 +147,12 @@ process insert_size_metrics {
     samtools view -h ${bam} | awk 'substr(\$0,1,1)=="@" || (\$5<20 && \$5>=0)' | samtools view -b > "\$bad_mapq_file"
 
     # Run Picard on high mapping quality reads
-    picard -Xmx${task.memory.toGiga()}g CollectInsertSizeMetrics \
+    picard -Xmx${Math.max(1, task.memory.toGiga())}g CollectInsertSizeMetrics \
         --INCLUDE_DUPLICATES --VALIDATION_STRINGENCY SILENT -I "\$good_mapq_file" -O good_mapq.out.txt \
         --MINIMUM_PCT 0 -H /dev/null
 
     # Run Picard on low mapping quality reads
-    picard -Xmx${task.memory.toGiga()}g CollectInsertSizeMetrics \
+    picard -Xmx${Math.max(1, task.memory.toGiga())}g CollectInsertSizeMetrics \
         --INCLUDE_DUPLICATES --VALIDATION_STRINGENCY SILENT -I "\$bad_mapq_file" -O bad_mapq.out.txt \
         --MINIMUM_PCT 0 -H /dev/null
 
@@ -227,7 +227,7 @@ process picard_metrics {
     script:
     """
     genome=\$(ls *.fa 2>/dev/null || ls *.fasta 2>/dev/null)
-    picard -Xmx${task.memory.toGiga()}g CollectAlignmentSummaryMetrics \
+    picard -Xmx${Math.max(1, task.memory.toGiga())}g CollectAlignmentSummaryMetrics \
         --VALIDATION_STRINGENCY SILENT -BS true -R \${genome} \
         -I ${bam} -O ${library}.alignment_summary_metrics.txt
     """

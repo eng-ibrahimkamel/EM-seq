@@ -356,7 +356,7 @@ process mergeAndMarkDuplicates {
 
     optical_distance=\$(echo \${inst_name} | awk '{if (\$1~/^M0|^NS|^NB/) {print 100} else {print 2500}}')
 
-    picard -Xmx${task.memory.toGiga()}g MarkDuplicates \
+    picard -Xmx${Math.max(1, task.memory.toGiga())}g MarkDuplicates \
         --TAGGING_POLICY All \
         --OPTICAL_DUPLICATE_PIXEL_DISTANCE \${optical_distance} \
         --TMP_DIR ${params.tmp_dir} \

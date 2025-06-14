@@ -336,14 +336,14 @@ process alignReads {
     # Calculate memory limit for samtools sort based on available memory
     sort_mem_per_thread=\$(echo "${task.memory}" | awk '{
         # Extract numeric part and unit
-        match($0, /([0-9.]+)[ ]*([A-Za-z]+)/, arr)
+        match(\$0, /([0-9.]+)[ ]*([A-Za-z]+)/, arr)
         value = arr[1]
         unit = arr[2]
 
         # Convert to MB based on unit
-        if (unit ~ /^[Gg][Bb]?$/) {
+        if (unit ~ /^[Gg][Bb]?\$/) {
             value = value * 1024  # Convert GB to MB
-        } else if (unit ~ /^[Kk][Bb]?$/) {
+        } else if (unit ~ /^[Kk][Bb]?\$/) {
             value = value / 1024  # Convert KB to MB
         }
 

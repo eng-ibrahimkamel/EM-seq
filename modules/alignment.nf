@@ -347,7 +347,7 @@ process bwa_index {
     label 'low_cpu'
     tag { genome }
     conda "conda-forge::python=3.10 bioconda::samtools=1.21 bioconda::bwameth=0.2.7"
-    storeDir "bwameth_index"
+    storeDir "${params.storeDir}"
     errorStrategy = 'retry'
     maxRetries = 3
 

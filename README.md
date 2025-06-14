@@ -9,6 +9,37 @@ Reference genomes containing spike-in methylation controls are available via an 
  - GRCh38: https://neb-em-seq-sra.s3.amazonaws.com/grch38_core%2Bbs_controls.fa
  - T2T chm13 (hs1): https://neb-em-seq-sra.s3.amazonaws.com/T2T_chm13v2.0%2Bbs_controls.fa
 
+## Execution Environments
+
+The pipeline supports both local and SLURM execution environments through Nextflow profiles:
+
+### Local Execution (Default)
+
+```bash
+nextflow run main.nf --input_glob '*_R1.fastq*' --path_to_genome_fasta /path/to/genome.fa --email your.email@example.com
+```
+
+### SLURM Execution
+
+To run on a SLURM cluster, use the `slurm` profile:
+
+```bash
+nextflow run main.nf --input_glob '*_R1.fastq*' --path_to_genome_fasta /path/to/genome.fa --email your.email@example.com -profile slurm
+```
+
+You may need to customize the SLURM settings in `nextflow.config` to match your cluster configuration:
+
+```groovy
+// In nextflow.config
+profiles {
+    slurm {
+        process.executor = 'slurm'
+        process.queue = 'your_queue'  // Change to your SLURM queue/partition
+        process.clusterOptions = '--account=your_account'  // Change to your SLURM account
+    }
+}
+```
+
 To use the Nextflow v1 scripts in this repository you need an older version of nextflow. 
 ```
 NXF_VER=22.10.4 nextflow run em-seq.nf --genome em-seq_ref_files/T2T_chm13v2.0+bs_controls.fa --flowcell AAC27FDF --fastq_glob '*_R{1,2}.fastq*' -resume

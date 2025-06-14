@@ -1,0 +1,98 @@
+#!/bin/bash
+# Configuration file for EM-seq shell scripts
+# This file contains common parameters used across install.sh, run_nextflow.sh, and run_test.sh
+RUN_SAMPLE="SAMPLE_1"
+# ===== Path Configuration =====
+INPUT_DATA_DIR="/Users/ikamel/Dropbox/Work/STCS/EM-seq-run/input"
+GENOME_PATH="/Users/ikamel/Dropbox/Work/STCS/EM-seq-run/input/reference.fa"
+OUTPUT_DIR="/Users/ikamel/Dropbox/Work/STCS/EM-seq-run/output/${RUN_SAMPLE}"
+BIN_SETUP_DIR="/Users/ikamel/Dropbox/Work/STCS/EM-seq-run/bin"
+mkdir -p "${BIN_SETUP_DIR}"
+MINICONDA_SETUP_DIR="${BIN_SETUP_DIR}/miniconda3"
+# ================================
+
+
+# ===== Nextflow Parameters =====
+INPUT_GLOB_PATTERN="${INPUT_DATA_DIR}/*1.fastq.gz"
+EMAIL="eng.ibrahimkamel@gmail.com"
+MAX_INPUT_READS=10000
+FLOWCELL="flowcell_pipeline"
+READ_LENGTH=151
+ENABLE_NEB_AGG="false"
+
+
+# Get the base directory (where this config file is located)
+# This ensures paths are consistent regardless of where the scripts are run from
+# Use parameter expansion with default value to avoid unbound variable error with set -u
+: "${BASE_DIR:=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+
+# ===== Miniconda Configuration =====
+CONDA_ENV_NAME="conda_env"
+# Miniconda URLs for different platforms
+MINICONDA_URL_MACOS_ARM64="https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-arm64.sh"
+MINICONDA_URL_MACOS_X86_64="https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh"
+MINICONDA_URL_LINUX_X86_64="https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
+
+
+# ===== Report Paths =====
+mkdir -p "${OUTPUT_DIR}"
+METADATA_DIR="${OUTPUT_DIR}/metadata"
+mkdir -p "${METADATA_DIR}"
+METADATA_REPORT_PATH="${METADATA_DIR}/emseq_metadata_report.html"
+METADATA_TIMELINE_PATH="${METADATA_DIR}/emseq_metadata_timeline.html"
+METADATA_DAG_PATH="${METADATA_DIR}/emseq_metadata_dag.html"
+RESULT_DIR="${OUTPUT_DIR}/result"
+mkdir -p "${RESULT_DIR}"
+STORE_DIR="${OUTPUT_DIR}/store/bwameth_index"
+mkdir -p "${STORE_DIR}"
+WORK_DIR="${OUTPUT_DIR}/work"
+mkdir -p "${WORK_DIR}"
+
+
+# ===== Logging Configuration =====
+LOG_DIR="${OUTPUT_DIR}/logs"
+mkdir -p "${LOG_DIR}"
+
+LOG_FILE="${LOG_DIR}/emseq_${RUN_SAMPLE}.log"
+
+# ===== Helper Functions =====
+# Function to log messages with timestamps
+log() {
+    local level="$1"
+    local message="$2"
+    local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+    echo "[${timestamp}] [${level}] ${message}" | tee -a "${LOG_FILE}"
+}
+
+# Function to log info messages
+log_info() {
+    log "INFO" "$1"
+}
+
+# Function to log warning messages
+log_warning() {
+    log "WARNING" "$1"
+}
+
+# Function to log error messages
+log_error() {
+    log "ERROR" "$1"
+}
+
+# Function to check if a command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Function to check if a file exists and is readable
+file_exists() {
+    [[ -f "$1" && -r "$1" ]]
+}
+
+# Function to check if a directory exists and is writable
+dir_exists() {
+    [[ -d "$1" && -w "$1" ]]
+}
+
+# Export functions so they're available in sourced scripts
+export -f log log_info log_warning log_error command_exists file_exists dir_exists

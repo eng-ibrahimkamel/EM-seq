@@ -3,10 +3,11 @@
 # This file contains common parameters used across install.sh, run_nextflow.sh, and run_test.sh
 RUN_SAMPLE="SAMPLE_1"
 # ===== Path Configuration =====
-INPUT_DATA_DIR="/Users/ikamel/Dropbox/Work/STCS/EM-seq-run/input"
-GENOME_PATH="/Users/ikamel/Dropbox/Work/STCS/EM-seq-run/input/reference.fa"
-OUTPUT_DIR="/Users/ikamel/Dropbox/Work/STCS/EM-seq-run/output/${RUN_SAMPLE}"
-BIN_SETUP_DIR="/Users/ikamel/Dropbox/Work/STCS/EM-seq-run/bin"
+SHARED_DIR="/Users/ikamel/Dropbox/Work/STCS"
+INPUT_DATA_DIR="${SHARED_DIR}/EM-seq-run/input"
+GENOME_PATH="${SHARED_DIR}/EM-seq-run/input/reference.fa"
+OUTPUT_DIR="${SHARED_DIR}/EM-seq-run/output/${RUN_SAMPLE}"
+BIN_SETUP_DIR="${SHARED_DIR}/EM-seq-run/bin"
 mkdir -p "${BIN_SETUP_DIR}"
 MINICONDA_SETUP_DIR="${BIN_SETUP_DIR}/miniconda3"
 # ================================
@@ -32,6 +33,7 @@ CONDA_ENV_NAME="conda_env"
 MINICONDA_URL_MACOS_ARM64="https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-arm64.sh"
 MINICONDA_URL_MACOS_X86_64="https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-x86_64.sh"
 MINICONDA_URL_LINUX_X86_64="https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
+MINICONDA_URL_LINUX_ARM64="https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh"
 
 
 # ===== Report Paths =====

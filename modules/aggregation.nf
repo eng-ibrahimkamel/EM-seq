@@ -2,7 +2,15 @@
 
 process multiqc {
     label 'medium_cpu'
-    conda "bioconda::multiqc=1.25 conda-forge::procps-ng"
+    conda {
+        // Skip procps-ng on macOS as it's not available
+        def os = System.getProperty("os.name").toLowerCase()
+        if (os.contains("mac") || os.contains("darwin")) {
+            "bioconda::multiqc=1.25"  // Skip procps-ng for macOS
+        } else {
+            "bioconda::multiqc=1.25 conda-forge::procps-ng"  // Include procps-ng for Linux
+        }
+    }
     publishDir "${params.outputDir}", mode: 'copy'
 
     input:
@@ -57,7 +65,15 @@ CONFIG
 
 process aggregate_emseq {
     tag { library }
-    conda "bioconda::samtools=1.21 conda-forge::procps-ng"
+    conda {
+        // Skip procps-ng on macOS as it's not available
+        def os = System.getProperty("os.name").toLowerCase()
+        if (os.contains("mac") || os.contains("darwin")) {
+            "bioconda::samtools=1.21"  // Skip procps-ng for macOS
+        } else {
+            "bioconda::samtools=1.21 conda-forge::procps-ng"  // Include procps-ng for Linux
+        }
+    }
     publishDir "${params.outputDir}/ngs-agg"
 
     input:         

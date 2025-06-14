@@ -1,7 +1,15 @@
 process enough_reads {
     label 'low_cpu'
     tag {library}
-    conda "bioconda::samtools=1.21 conda-forge::procps-ng"
+    conda {
+        // Skip procps-ng on macOS as it's not available
+        def os = System.getProperty("os.name").toLowerCase()
+        if (os.contains("mac") || os.contains("darwin")) {
+            "bioconda::samtools=1.21"  // Skip procps-ng for macOS
+        } else {
+            "bioconda::samtools=1.21 conda-forge::procps-ng"  // Include procps-ng for Linux
+        }
+    }
 
     input:
         tuple val(email), 
@@ -52,7 +60,15 @@ process enough_reads {
 
 process send_email {
     label 'low_cpu'
-    conda "conda-forge::procps-ng"
+    conda {
+        // Skip procps-ng on macOS as it's not available
+        def os = System.getProperty("os.name").toLowerCase()
+        if (os.contains("mac") || os.contains("darwin")) {
+            ""  // Empty conda environment for macOS
+        } else {
+            "conda-forge::procps-ng"  // Include procps-ng for Linux
+        }
+    }
 
     input:
         file libraries
@@ -84,7 +100,15 @@ process send_email {
 process alignReads {
     label 'high_cpu'
     tag { library }
-    conda "conda-forge::python=3.10 bioconda::bwameth=0.2.7 bioconda::fastp=0.23.4 bioconda::mark-nonconverted-reads=1.2 bioconda::sambamba=1.0 bioconda::samtools=1.21 bioconda::seqtk=1.4 bioconda::pysam conda-forge::procps-ng"
+    conda {
+        // Skip procps-ng on macOS as it's not available
+        def os = System.getProperty("os.name").toLowerCase()
+        if (os.contains("mac") || os.contains("darwin")) {
+            "conda-forge::python=3.10 bioconda::bwameth=0.2.7 bioconda::fastp=0.23.4 bioconda::mark-nonconverted-reads=1.2 bioconda::sambamba=1.0 bioconda::samtools=1.21 bioconda::seqtk=1.4 bioconda::pysam"  // Skip procps-ng for macOS
+        } else {
+            "conda-forge::python=3.10 bioconda::bwameth=0.2.7 bioconda::fastp=0.23.4 bioconda::mark-nonconverted-reads=1.2 bioconda::sambamba=1.0 bioconda::samtools=1.21 bioconda::seqtk=1.4 bioconda::pysam conda-forge::procps-ng"  // Include procps-ng for Linux
+        }
+    }
     publishDir "${params.outputDir}/bwameth_align"
 
     input:
@@ -306,7 +330,15 @@ process mergeAndMarkDuplicates {
     label 'high_cpu'
     tag { library }
     publishDir "${params.outputDir}/markduped_bams", mode: 'copy', pattern: '*.md.{bam,bai}'
-    conda "bioconda::picard=3.1 bioconda::samtools=1.21 conda-forge::procps-ng"
+    conda {
+        // Skip procps-ng on macOS as it's not available
+        def os = System.getProperty("os.name").toLowerCase()
+        if (os.contains("mac") || os.contains("darwin")) {
+            "bioconda::picard=3.1 bioconda::samtools=1.21"  // Skip procps-ng for macOS
+        } else {
+            "bioconda::picard=3.1 bioconda::samtools=1.21 conda-forge::procps-ng"  // Include procps-ng for Linux
+        }
+    }
 
     input:
         tuple val(library), path(bam), path(bai), val(barcodes) 
@@ -348,7 +380,15 @@ process bwa_index {
 
     label 'low_cpu'
     tag { genome }
-    conda "conda-forge::python=3.10 bioconda::samtools=1.21 bioconda::bwameth=0.2.7 conda-forge::procps-ng"
+    conda {
+        // Skip procps-ng on macOS as it's not available
+        def os = System.getProperty("os.name").toLowerCase()
+        if (os.contains("mac") || os.contains("darwin")) {
+            "conda-forge::python=3.10 bioconda::samtools=1.21 bioconda::bwameth=0.2.7"  // Skip procps-ng for macOS
+        } else {
+            "conda-forge::python=3.10 bioconda::samtools=1.21 bioconda::bwameth=0.2.7 conda-forge::procps-ng"  // Include procps-ng for Linux
+        }
+    }
     storeDir "${params.storeDir}"
     errorStrategy = 'retry'
     maxRetries = 3
@@ -397,7 +437,15 @@ process bwa_index {
 }
 
 process touchFile {   
-    conda "conda-forge::procps-ng"
+    conda {
+        // Skip procps-ng on macOS as it's not available
+        def os = System.getProperty("os.name").toLowerCase()
+        if (os.contains("mac") || os.contains("darwin")) {
+            ""  // Empty conda environment for macOS
+        } else {
+            "conda-forge::procps-ng"  // Include procps-ng for Linux
+        }
+    }
 
     input:
         val filename

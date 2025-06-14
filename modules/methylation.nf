@@ -3,7 +3,15 @@ process methylDackel_mbias {
     label 'medium_cpu'
     errorStrategy 'retry'
     tag "${library}"
-    conda "bioconda::methyldackel=0.6.1 bioconda::samtools=1.21 conda-forge::pigz=2.8 conda-forge::procps-ng"
+    conda {
+        // Skip procps-ng on macOS as it's not available
+        def os = System.getProperty("os.name").toLowerCase()
+        if (os.contains("mac") || os.contains("darwin")) {
+            "bioconda::methyldackel=0.6.1 bioconda::samtools=1.21 conda-forge::pigz=2.8"  // Skip procps-ng for macOS
+        } else {
+            "bioconda::methyldackel=0.6.1 bioconda::samtools=1.21 conda-forge::pigz=2.8 conda-forge::procps-ng"  // Include procps-ng for Linux
+        }
+    }
     publishDir "${params.outputDir}/methylDackelExtracts/mbias"
 
     input:
@@ -72,7 +80,15 @@ process methylDackel_extract {
     label 'high_cpu'
     tag "${library}"
     publishDir "${params.outputDir}/methylDackelExtracts", mode: 'copy'
-    conda "bioconda::methyldackel=0.6.1 bioconda::samtools=1.21 conda-forge::pigz=2.8 conda-forge::procps-ng"
+    conda {
+        // Skip procps-ng on macOS as it's not available
+        def os = System.getProperty("os.name").toLowerCase()
+        if (os.contains("mac") || os.contains("darwin")) {
+            "bioconda::methyldackel=0.6.1 bioconda::samtools=1.21 conda-forge::pigz=2.8"  // Skip procps-ng for macOS
+        } else {
+            "bioconda::methyldackel=0.6.1 bioconda::samtools=1.21 conda-forge::pigz=2.8 conda-forge::procps-ng"  // Include procps-ng for Linux
+        }
+    }
 
     input:
         tuple val(library), path(md_bam), path(md_bai), val(barcodes) 

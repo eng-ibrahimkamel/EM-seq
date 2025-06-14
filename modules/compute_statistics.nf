@@ -2,7 +2,15 @@
 process gc_bias {
     label 'medium_cpu'
     tag { library }
-    conda "bioconda::picard=3.3.0 bioconda::samtools=1.21 conda-forge::procps-ng"
+    conda {
+        // Skip procps-ng on macOS as it's not available
+        def os = System.getProperty("os.name").toLowerCase()
+        if (os.contains("mac") || os.contains("darwin")) {
+            "bioconda::picard=3.3.0 bioconda::samtools=1.21"  // Skip procps-ng for macOS
+        } else {
+            "bioconda::picard=3.3.0 bioconda::samtools=1.21 conda-forge::procps-ng"  // Include procps-ng for Linux
+        }
+    }
     publishDir "${params.outputDir}/stats/gc_bias"
 
     input:
@@ -29,7 +37,15 @@ process gc_bias {
 process idx_stats {
     label 'medium_cpu'
     tag { library }
-    conda "bioconda::samtools=1.21 conda-forge::procps-ng"
+    conda {
+        // Skip procps-ng on macOS as it's not available
+        def os = System.getProperty("os.name").toLowerCase()
+        if (os.contains("mac") || os.contains("darwin")) {
+            "bioconda::samtools=1.21"  // Skip procps-ng for macOS
+        } else {
+            "bioconda::samtools=1.21 conda-forge::procps-ng"  // Include procps-ng for Linux
+        }
+    }
     publishDir "${params.outputDir}/stats/idxstats"
 
     input:
@@ -47,7 +63,15 @@ process idx_stats {
 process flag_stats {
     label 'medium_cpu'
     tag { library }
-    conda "bioconda::samtools=1.21 conda-forge::procps-ng"
+    conda {
+        // Skip procps-ng on macOS as it's not available
+        def os = System.getProperty("os.name").toLowerCase()
+        if (os.contains("mac") || os.contains("darwin")) {
+            "bioconda::samtools=1.21"  // Skip procps-ng for macOS
+        } else {
+            "bioconda::samtools=1.21 conda-forge::procps-ng"  // Include procps-ng for Linux
+        }
+    }
     publishDir "${params.outputDir}/stats/flagstats"
 
     input:
@@ -65,7 +89,15 @@ process flag_stats {
 process fastqc {
     label 'medium_cpu'
     tag { library }
-    conda "bioconda::fastqc=0.11.8 conda-forge::procps-ng"
+    conda {
+        // Skip procps-ng on macOS as it's not available
+        def os = System.getProperty("os.name").toLowerCase()
+        if (os.contains("mac") || os.contains("darwin")) {
+            "bioconda::fastqc=0.11.8"  // Skip procps-ng for macOS
+        } else {
+            "bioconda::fastqc=0.11.8 conda-forge::procps-ng"  // Include procps-ng for Linux
+        }
+    }
     publishDir "${params.outputDir}/stats/fastqc"
 
     input:
@@ -83,7 +115,15 @@ process fastqc {
 process insert_size_metrics {
     label 'medium_cpu'
     tag { library }
-    conda "bioconda::picard=3.3.0 bioconda::samtools=1.21 conda-forge::procps-ng"
+    conda {
+        // Skip procps-ng on macOS as it's not available
+        def os = System.getProperty("os.name").toLowerCase()
+        if (os.contains("mac") || os.contains("darwin")) {
+            "bioconda::picard=3.3.0 bioconda::samtools=1.21"  // Skip procps-ng for macOS
+        } else {
+            "bioconda::picard=3.3.0 bioconda::samtools=1.21 conda-forge::procps-ng"  // Include procps-ng for Linux
+        }
+    }
     publishDir "${params.outputDir}/stats/insert_size"
 
     input:
@@ -166,7 +206,15 @@ process insert_size_metrics {
 process picard_metrics {
     label 'medium_cpu'
     tag { library }
-    conda "bioconda::picard=3.3.0 bioconda::samtools=1.21 conda-forge::procps-ng"
+    conda {
+        // Skip procps-ng on macOS as it's not available
+        def os = System.getProperty("os.name").toLowerCase()
+        if (os.contains("mac") || os.contains("darwin")) {
+            "bioconda::picard=3.3.0 bioconda::samtools=1.21"  // Skip procps-ng for macOS
+        } else {
+            "bioconda::picard=3.3.0 bioconda::samtools=1.21 conda-forge::procps-ng"  // Include procps-ng for Linux
+        }
+    }
     publishDir "${params.outputDir}/stats/picard_alignment_metrics"
 
     input:
@@ -188,7 +236,15 @@ process picard_metrics {
 process tasmanian {
     label 'medium_cpu'
     tag { library }
-    conda "bioconda::samtools=1.21 conda-forge::procps-ng"
+    conda {
+        // Skip procps-ng on macOS as it's not available
+        def os = System.getProperty("os.name").toLowerCase()
+        if (os.contains("mac") || os.contains("darwin")) {
+            "bioconda::samtools=1.21"  // Skip procps-ng for macOS
+        } else {
+            "bioconda::samtools=1.21 conda-forge::procps-ng"  // Include procps-ng for Linux
+        }
+    }
 
     input:
         tuple val(library), path(bam), path(bai), val(barcodes)

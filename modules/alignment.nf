@@ -395,6 +395,8 @@ process bwa_index {
 }
 
 process touchFile {   
+    conda "conda-forge::procps-ng"
+
     input:
         val filename
 

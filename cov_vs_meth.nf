@@ -1,5 +1,5 @@
 #!/usr/bin/env nextflow
- 
+
 params.genome = '/mnt/galaxy/data/genome/grch38_core+bs_controls/sam_indexes/grch38_core+bs_controls/grch38_core+bs_controls.fa'
 
 //CPG Islands from  UCSC table browser 
@@ -65,8 +65,8 @@ process epd_methylation {
 }
 
 process epd_promoter_counts{
+    label 'high_cpu'
     conda "subread=2.0.0"
-    cpus 16
 
     input:
         file gtf from epd_promoters_gtf
@@ -124,8 +124,8 @@ process cpg_island_methylation {
 }
 
 process cpg_island_counts{
+    label 'high_cpu'
     conda "subread=2.0.0"
-    cpus 16
 
     input:
         file gtf from cpg_islands_gtf
@@ -185,7 +185,7 @@ process refseq_feature_gtfs {
     tail -n +2 flat_name_converted.saf \
       | awk -v OFS='\\t' -v FS='\\t' '{print $2,$3-1,$4,$1,"-",$5}' \
       | bedtools sort -faidx !{params.genome}.fai -i /dev/stdin > !{feature}_flat.bed
-    
+
     #filters by feature type
     awk -v type=!{feature} -v OFS='\\t' -v FS='\\t' '($3==type) { print}' name_converted.gff \
     > !{feature}.gtf
@@ -208,7 +208,7 @@ process refseq_feature_methylation {
 
     output:
         file '*_methylation.tsv' into feature_methylation
-        
+
     shell:
     '''
     bedtools intersect -nonamecheck \
@@ -227,10 +227,9 @@ feature_saf_for_counts
     .set{feature_bams_for_refseq}
 
 process refseq_feature_counts {
-
+    label 'high_cpu'
     conda "subread=2.0.0"
     publishDir "$params.output_dir", mode: 'copy'
-    cpus 16
 
     input:
         tuple (feature, path(feature_saf), path('*'), path('*') ) from feature_bams_for_refseq
@@ -278,7 +277,7 @@ process dfam_feature_methylation {
 
     output:
         file '*_methylation.tsv' into dfam_methylation
-        
+
     shell:
     '''
     bedtools intersect -nonamecheck \
@@ -291,10 +290,9 @@ process dfam_feature_methylation {
 }
 
 process dfam_feature_counts {
-
+    label 'high_cpu'
     conda "subread=2.0.0"
     publishDir "$params.output_dir", mode: 'copy'
-    cpus 16
 
     input:
         file(gtf) from dfam_gtf_for_counts

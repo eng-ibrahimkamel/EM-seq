@@ -4,7 +4,7 @@ annotation = params.annotation
 ref_len = params.reference_lengths
 
 process make_bed {
-    cpus 5
+    label 'medium_cpu'
     conda "bioconda::deeptools"
     errorStrategy 'finish'
 
@@ -25,7 +25,7 @@ process make_bed {
 }
 
 process make_bigwig {
-    cpus 1
+    label 'low_cpu'
     conda "bioconda::ucsc-bedgraphtobigwig"
     publishDir "/mnt/home/mcampbell/20200317_new_emseq_figure", mode: "copy"
     errorStrategy 'finish'
@@ -45,13 +45,13 @@ process make_bigwig {
 }
 
 process binned_figure {
-    cpus 1
+    label 'low_cpu'
     publishDir "/mnt/home/mcampbell/20200317_new_emseq_figure", mode: "copy"
     errorStrategy 'finish'
 
     input:
         file methylkit from for_bins
-    
+
     output:
         file ('*.tab') into _bins
 

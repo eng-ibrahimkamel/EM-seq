@@ -21,7 +21,7 @@ Channel.fromFilePairs(fastq_glob)
     }.set{fq_set_channel}
 
 process mapping {
-    cpus fastq_mode == 'tile-fastq' ? 4 : 16
+    label 'high_cpu'
     errorStrategy 'retry'
     tag { [flowcell, fq_set.library] }
     conda "bioconda::bwameth=0.2.2 bioconda::seqtk=1.3 bioconda::sambamba=0.7.0 bioconda::fastp=0.20.1 bioconda::mark-nonconverted-reads=1.1"
@@ -58,7 +58,7 @@ process mapping {
 }
 
 process mergeAndMarkDuplicates {
-    cpus 8
+    label 'high_cpu'
     errorStrategy 'retry'
     tag { library }
     publishDir "${outputPath}", mode: 'copy', pattern: '*.{md.bam}*'
@@ -92,7 +92,7 @@ process mergeAndMarkDuplicates {
 
 
     process methylDackel_mbias {
-        cpus 8
+        label 'high_cpu'
         errorStrategy 'retry'
         tag {library}
         conda "bioconda::methyldackel=0.6.1 conda-forge::pigz=2.8"
@@ -159,7 +159,7 @@ process mergeAndMarkDuplicates {
     }
 
     process methylDackel_extract {
-        cpus 8
+        label 'high_cpu'
         tag {library}
         publishDir "${outputPath}", mode: 'copy'
         conda "bioconda::methyldackel=0.6.1 conda-forge::pigz=2.8"
@@ -182,7 +182,7 @@ process mergeAndMarkDuplicates {
     }
 
     process select_human_reads {
-        cpus 8 
+        label 'high_cpu'
         tag {library}
         conda "bioconda::sambamba=0.7.1 bioconda::bedtools=2.29.2"
 
@@ -205,7 +205,7 @@ process mergeAndMarkDuplicates {
     }
 
     process runFastQC {
-        cpus 1
+        label 'low_cpu'
         errorStrategy 'retry'
         tag { library }
         conda "bioconda::fastqc=0.11.8"
@@ -265,7 +265,7 @@ process mergeAndMarkDuplicates {
     }
 
     process samtools_flagstats {
-        cpus 2
+        label 'medium_cpu'
         errorStrategy 'retry'
         tag { library }
         conda "bioconda::samtools=1.9"
@@ -288,7 +288,7 @@ process mergeAndMarkDuplicates {
     }
 
     process samtools_stats {
-        cpus 2
+        label 'medium_cpu'
         errorStrategy 'retry'
         tag { library }
         conda "bioconda::samtools=1.9"
@@ -307,7 +307,7 @@ process mergeAndMarkDuplicates {
     }
 
     process picard_gc_bias {
-        cpus 1
+        label 'low_cpu'
         errorStrategy 'retry'
         tag { library }
         conda "bioconda::picard=2.20.7"
@@ -325,8 +325,7 @@ process mergeAndMarkDuplicates {
     }
 
     process picard_stats {
-
-        cpus 4
+        label 'medium_cpu'
         errorStrategy 'retry'
         tag { library }
         conda "bioconda::picard=2.20.7"

@@ -112,7 +112,7 @@ else
         log_error "Failed to install Nextflow and dependencies"
         exit 1
     }
-}
+fi
 
 # Verify installations
 log_info "Verifying installations"

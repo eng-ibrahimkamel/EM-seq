@@ -13,18 +13,19 @@ slurm {
     process.executor = 'slurm'
     process.queue = 'normal'  // Default queue/partition
     process.clusterOptions = '--account=your_account'  // Replace with your SLURM account
-    
+
     // SLURM-specific resource parameters
     process.memory = { ... }
     process.time = { ... }
     process.cpus = { ... }
-    
+
     // Limit job submission rate
     executor.queueSize = 100
-    
+
     // Adjust resource limits for SLURM environment
-    params.max_memory = 128.GB
-    params.max_cpus = 32
+    // Memory limits are set low for Docker-based Slurm compatibility
+    params.max_memory = 900.MB
+    params.max_cpus = 2
     params.max_time = 72.h
 }
 ```
@@ -57,6 +58,22 @@ Or run Nextflow directly with the Slurm profile:
 nextflow run main.nf -profile slurm [other parameters]
 ```
 
+## Memory Limitations in Docker-based Slurm
+
+The Docker-based Slurm cluster provided with this repository has very limited resources:
+
+- Each node has only 1000 MB (1 GB) of memory (`RealMemory=1000` in slurm.conf)
+- The default memory per CPU is 500 MB (`DefMemPerCPU=500` in slurm.conf)
+- There are only 2 compute nodes available (`c[1-2]` in slurm.conf)
+
+Due to these limitations, the memory settings in the Slurm profile have been significantly reduced:
+
+- Maximum memory per job: 900 MB (reduced from 128 GB)
+- Maximum CPUs per job: 2 (reduced from 32)
+- Default process memory: 500 MB per task attempt (reduced from 6 GB)
+
+If you're running on a production Slurm cluster with more resources, you may want to increase these limits in `nextflow.config`.
+
 ## Troubleshooting
 
 If you encounter issues:
@@ -66,5 +83,6 @@ If you encounter issues:
 3. Check Slurm job status with `squeue` and `sacct`
 4. Review Slurm job logs in the output directory
 5. Ensure that the Slurm daemons are running properly
+6. If you see "Memory specification can not be satisfied" errors, check the memory limits in your Slurm cluster and adjust the memory settings in `nextflow.config` accordingly
 
 For Docker-based Slurm, see the documentation in the `slurm-docker-cluster` directory.

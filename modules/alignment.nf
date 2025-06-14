@@ -127,15 +127,27 @@ process alignReads {
 
     script:
 
-    // Set memory, dynamically, based on input file size
+    // Set memory, dynamically, based on input file size and respecting resource constraints
     def fileSizeGB = input_file1.size() / (1024 * 1024 * 1024) // Convert bytes to GB
     def currentMemoryGB = task.memory.toGiga() // Convert task.memory to GB
-    def minMemoryGB = 7 // Reduced from 8GB to 7GB to avoid exceeding available memory
-    def memoryGB = Math.max(Math.max(currentMemoryGB, minMemoryGB), Math.ceil(fileSizeGB * 2)) // Minimum 7GB or 2x file size
-    task.memory = "${memoryGB} GB"
 
-    // Define sambamba_memory here, outside the bash script
-    def sambamba_memory = "${Math.max(4, (task.memory.toGiga()*3).intdiv(4))}GB"
+    // Check if we're running in SLURM environment and adjust memory accordingly
+    def slurm_profile = workflow.profile.contains('slurm')
+    def minMemoryGB = slurm_profile ? 0.8 : 7 // Use 800MB for SLURM, 7GB otherwise
+
+    // Calculate memory based on file size but respect limits
+    def memoryGB = Math.min(
+        params.max_memory.toGiga(),
+        Math.max(Math.max(currentMemoryGB, minMemoryGB), Math.ceil(fileSizeGB * 1.5))
+    )
+
+    task.memory = "${memoryGB} GB"
+    println "Task memory set to ${task.memory} (SLURM mode: ${slurm_profile})"
+
+    // Define sambamba_memory here, outside the bash script, respecting resource constraints
+    def sambamba_memory = slurm_profile ? 
+        "${Math.min(0.7, (task.memory.toGiga()*3).intdiv(4))}GB" : // For SLURM, limit to 700MB max
+        "${Math.max(4, (task.memory.toGiga()*3).intdiv(4))}GB"     // For non-SLURM, minimum 4GB
 
     """
 
@@ -305,6 +317,14 @@ process alignReads {
     | fastp --stdin --stdout -l 2 -Q \${trim_polyg} --interleaved_in --overrepresentation_analysis -j "\${base_outputname}.fastp.json" 2> fastp.stderr \
     | bwameth.py -p -t ${Math.max(1,(task.cpus*7).intdiv(8))} --read-group "\${rg_line}" --reference \${genome} /dev/stdin 2> "\${base_outputname}.log.bwamem" > "\${base_outputname}.sam"
 
+    # Check exit status of the bwameth.py command
+    bwameth_exit=$?
+    if [ $bwameth_exit -ne 0 ]; then
+        echo "BWA-MEM alignment failed with exit code $bwameth_exit"
+        echo "This might be due to memory constraints. Check the log file for details."
+        exit $bwameth_exit
+    fi
+
     # Step 2: Reheader the SAM file
     cat "\${base_outputname}.sam" | reheader_sam /dev/stdin > "\${base_outputname}.reheadered.sam"
 
@@ -313,8 +333,33 @@ process alignReads {
     touch "\${base_outputname}.nonconverted.tsv"
 
     # Step 4: Convert to BAM and sort using samtools instead of sambamba
+    # Calculate memory limit for samtools sort based on available memory
+    sort_mem_per_thread=\$(echo "${task.memory}" | awk '{
+        # Extract numeric part and unit
+        match($0, /([0-9.]+)[ ]*([A-Za-z]+)/, arr)
+        value = arr[1]
+        unit = arr[2]
+
+        # Convert to MB based on unit
+        if (unit ~ /^[Gg][Bb]?$/) {
+            value = value * 1024  # Convert GB to MB
+        } else if (unit ~ /^[Kk][Bb]?$/) {
+            value = value / 1024  # Convert KB to MB
+        }
+
+        # Calculate memory per thread (75% of total divided by thread count)
+        mem_per_thread = int((value * 0.75) / '${Math.max(1,task.cpus.intdiv(4))}')
+
+        # Ensure minimum of 100M per thread
+        if (mem_per_thread < 100) mem_per_thread = 100
+
+        print mem_per_thread "M"
+    }')
+
+    echo "Memory per thread for samtools sort: \$sort_mem_per_thread"
+
     samtools view -u "\${base_outputname}.reheadered.sam" | \
-    samtools sort -@ ${Math.max(1,task.cpus.intdiv(4))} -T ${params.tmp_dir}/tmp -o "\${base_outputname}.aln.bam" -
+    samtools sort -m \$sort_mem_per_thread -@ ${Math.max(1,task.cpus.intdiv(4))} -T ${params.tmp_dir}/tmp -o "\${base_outputname}.aln.bam" -
 
     # Index the BAM file
     samtools index "\${base_outputname}.aln.bam"

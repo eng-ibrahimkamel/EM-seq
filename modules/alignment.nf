@@ -159,6 +159,10 @@ process alignReads {
         "${Math.min(0.7d, memThreeQuarters)}GB" : // For SLURM, limit to 700MB max
         "${Math.max(4.0d, memThreeQuarters)}GB"   // For non-SLURM, minimum 4GB
 
+    // Calculate threads for bwameth and samtools sort ensuring consistent types
+    def bwamethThreads = Math.max(1, (task.cpus.intValue() * 7 / 8).intValue())
+    def sortThreads = Math.max(1, (task.cpus.intValue() / 4).intValue())
+
     """
 
     echo "Input file size: ${fileSizeGB} GB"
@@ -323,8 +327,6 @@ process alignReads {
 
     # Break the pipeline into smaller steps to isolate issues
     # Step 1: Process reads and align
-    # Calculate threads for bwameth ensuring consistent types
-    def bwamethThreads = Math.max(1, (task.cpus.intValue() * 7 / 8).intValue())
 
     eval \${stream_reads} \${bam2fastq} \
     | fastp --stdin --stdout -l 2 -Q \${trim_polyg} --interleaved_in --overrepresentation_analysis -j "\${base_outputname}.fastp.json" 2> fastp.stderr \
@@ -366,8 +368,6 @@ process alignReads {
         mem_value_mb=\$(echo "\${mem_value}" | cut -d'.' -f1)
     fi
 
-    # Calculate threads for samtools sort ensuring consistent types
-    def sortThreads = Math.max(1, (task.cpus.intValue() / 4).intValue())
 
     # Calculate memory per thread (75% of total divided by thread count)
     threads=${sortThreads}

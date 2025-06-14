@@ -99,9 +99,9 @@ log_info "Creating ${CONDA_ENV_NAME} environment"
 }
 
 # Install Nextflow in the environment
-log_info "Installing Nextflow in the ${CONDA_ENV_NAME} environment"
-"${MINICONDA_SETUP_DIR}/bin/conda" run -n "${CONDA_ENV_NAME}" conda install -c conda-forge -c bioconda nextflow samtools=1.21 -y || {
-    log_error "Failed to install Nextflow"
+log_info "Installing Nextflow and required dependencies in the ${CONDA_ENV_NAME} environment"
+"${MINICONDA_SETUP_DIR}/bin/conda" run -n "${CONDA_ENV_NAME}" conda install -c conda-forge -c bioconda nextflow samtools=1.21 procps -y || {
+    log_error "Failed to install Nextflow and dependencies"
     exit 1
 }
 

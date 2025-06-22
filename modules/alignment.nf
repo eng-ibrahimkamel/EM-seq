@@ -475,10 +475,22 @@ process bwa_index {
     // BWA indexing typically requires 5-6x the reference genome size
     memory = {
         def slurm_profile = workflow.profile.contains('slurm')
-        // For a 3GB reference genome, allocate at least 16GB
-        def min_memory = slurm_profile ? 16.GB : 6.GB
+        // For a 3GB reference genome, allocate at least 24GB
+        def min_memory = slurm_profile ? 24.GB : 6.GB
 
         check_max(min_memory * task.attempt, 'memory')
+    }
+
+    // Add specific SLURM directives for this memory-intensive process
+    clusterOptions = {
+        def slurm_profile = workflow.profile.contains('slurm')
+        if (slurm_profile) {
+            // Request a node with high memory, without using specific constraints
+            // that might not be available in all SLURM configurations
+            return '--mem=24G'
+        } else {
+            return ''
+        }
     }
 
     output:

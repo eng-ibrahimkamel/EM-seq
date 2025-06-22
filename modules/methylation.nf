@@ -28,6 +28,19 @@ process methylDackel_mbias {
     def fileSizeGB = md_bam.size() / (1024 * 1024 * 1024) // Convert bytes to GB
     def currentMemoryGB = task.memory.toGiga() // Convert task.memory to GB
 
+    // Ensure all values are explicitly converted to double to avoid type ambiguity
+    def maxMemoryGB = params.max_memory.toGiga().doubleValue()
+    def currentMemGB = currentMemoryGB.doubleValue()
+    def minMemGB = 1.0d
+    def fileBasedMemGB = Math.ceil(fileSizeGB * 1.2).doubleValue()
+
+    // MethylDackel mbias is less memory-intensive than extract
+    // but still benefits from scaling with file size
+    def memoryGB = Math.min(
+        maxMemoryGB,
+        Math.max(Math.max(currentMemGB, minMemGB), fileBasedMemGB)
+    )
+
     // Adjust CPUs based on available resources
     // Convert to integers for CPU calculations
     def taskCpusInt = task.cpus.intValue()
@@ -39,6 +52,8 @@ process methylDackel_mbias {
         taskCpusInt,
         Math.max(minCpus, Math.min(maxCpus, fileSizeInt))
     )
+
+    task.memory = "${memoryGB} GB"
 
     """
     echo "Input BAM size: ${fileSizeGB} GB"
@@ -121,6 +136,19 @@ process methylDackel_extract {
     def fileSizeGB = md_bam.size() / (1024 * 1024 * 1024) // Convert bytes to GB
     def currentMemoryGB = task.memory.toGiga() // Convert task.memory to GB
 
+    // Ensure all values are explicitly converted to double to avoid type ambiguity
+    def maxMemoryGB = params.max_memory.toGiga().doubleValue()
+    def currentMemGB = currentMemoryGB.doubleValue()
+    def minMemGB = 2.0d
+    def fileBasedMemGB = Math.ceil(fileSizeGB * 2).doubleValue()
+
+    // MethylDackel is memory-intensive for large files
+    // Scale memory with file size but ensure minimum and respect maximum
+    def memoryGB = Math.min(
+        maxMemoryGB,
+        Math.max(Math.max(currentMemGB, minMemGB), fileBasedMemGB)
+    )
+
     // Adjust CPUs based on available resources and file size
     // Convert to integers for CPU calculations
     def taskCpusInt = task.cpus.intValue()
@@ -135,6 +163,8 @@ process methylDackel_extract {
 
     // Convert cpusToUse to integer for pigz (already an integer from above calculations)
     def cpusToUseInt = cpusToUse
+
+    task.memory = "${memoryGB} GB"
 
     """
     echo "Input BAM size: ${fileSizeGB} GB"

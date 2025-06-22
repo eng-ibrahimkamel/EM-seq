@@ -556,11 +556,11 @@ process bwa_index {
         if command -v bwameth.py >/dev/null 2>&1; then
             echo "Found bwameth.py in PATH, running indexing command"
             # Check file size of the reference genome
-            ref_size=\$(du -h "${real_genome_file}" | cut -f1)
+            ref_size=\$(du -h "\${real_genome_file}" | cut -f1)
             echo "Reference genome size: \${ref_size}"
 
             # Estimate memory requirements (5-6x the reference size)
-            ref_size_bytes=\$(stat -c %s "${real_genome_file}" 2>/dev/null || stat -f %z "${real_genome_file}")
+            ref_size_bytes=\$(stat -c %s "\${real_genome_file}" 2>/dev/null || stat -f %z "\${real_genome_file}")
             ref_size_gb=\$(echo "scale=2; \${ref_size_bytes}/1024/1024/1024" | bc)
             echo "Reference genome size in GB: \${ref_size_gb}"
             echo "Estimated memory required: \$(echo "scale=2; \${ref_size_gb} * 6" | bc)GB"
@@ -604,11 +604,11 @@ process bwa_index {
             if command -v bwameth.py >/dev/null 2>&1; then
                 echo "bwameth installed successfully, running indexing command"
                 # Check file size of the reference genome
-                ref_size=\$(du -h "${real_genome_file}" | cut -f1)
+                ref_size=\$(du -h "\${real_genome_file}" | cut -f1)
                 echo "Reference genome size: \${ref_size}"
 
                 # Estimate memory requirements (5-6x the reference size)
-                ref_size_bytes=\$(stat -c %s "${real_genome_file}" 2>/dev/null || stat -f %z "${real_genome_file}")
+                ref_size_bytes=\$(stat -c %s "\${real_genome_file}" 2>/dev/null || stat -f %z "\${real_genome_file}")
                 ref_size_gb=\$(echo "scale=2; \${ref_size_bytes}/1024/1024/1024" | bc)
                 echo "Reference genome size in GB: \${ref_size_gb}"
                 echo "Estimated memory required: \$(echo "scale=2; \${ref_size_gb} * 6" | bc)GB"

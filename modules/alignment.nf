@@ -516,11 +516,11 @@ process bwa_index {
 
     # Check if we have enough memory for a 3GB reference genome
     # BWA indexing typically requires 5-6x the reference genome size
-    total_mem_kb=$(free | grep Mem | awk '{print $2}')
+    total_mem_kb=\$(free | grep Mem | awk '{print $2}')
     if [ -n "$total_mem_kb" ]; then
-        total_mem_gb=$(echo "scale=2; $total_mem_kb/1024/1024" | bc)
+        total_mem_gb=\$(echo "scale=2; $total_mem_kb/1024/1024" | bc)
         echo "Total system memory: ${total_mem_gb}GB"
-        if (( $(echo "$total_mem_gb < 15" | bc -l) )); then
+        if (( \$(echo "$total_mem_gb < 15" | bc -l) )); then
             echo "WARNING: Available memory (${total_mem_gb}GB) may be insufficient for indexing a 3GB reference genome"
             echo "BWA indexing typically requires 5-6x the reference genome size (15-18GB recommended)"
         fi
@@ -556,22 +556,22 @@ process bwa_index {
         if command -v bwameth.py >/dev/null 2>&1; then
             echo "Found bwameth.py in PATH, running indexing command"
             # Check file size of the reference genome
-            ref_size=$(du -h "${real_genome_file}" | cut -f1)
+            ref_size=\$(du -h "${real_genome_file}" | cut -f1)
             echo "Reference genome size: ${ref_size}"
 
             # Estimate memory requirements (5-6x the reference size)
-            ref_size_bytes=$(stat -c %s "${real_genome_file}" 2>/dev/null || stat -f %z "${real_genome_file}")
-            ref_size_gb=$(echo "scale=2; ${ref_size_bytes}/1024/1024/1024" | bc)
+            ref_size_bytes=\$(stat -c %s "${real_genome_file}" 2>/dev/null || stat -f %z "${real_genome_file}")
+            ref_size_gb=\$(echo "scale=2; ${ref_size_bytes}/1024/1024/1024" | bc)
             echo "Reference genome size in GB: ${ref_size_gb}"
-            echo "Estimated memory required: $(echo "scale=2; ${ref_size_gb} * 6" | bc)GB"
+            echo "Estimated memory required: \$(echo "scale=2; ${ref_size_gb} * 6" | bc)GB"
 
             # Run with set -x to show commands being executed
-            echo "Starting BWA indexing at $(date)"
+            echo "Starting BWA indexing at \$(date)"
             set -x
             /usr/bin/time -v bwameth.py index \${real_genome_file} 2> bwameth_index.log || true
             index_exit=\$?
             set +x
-            echo "BWA indexing finished at $(date)"
+            echo "BWA indexing finished at \$(date)"
 
             # Check for common error patterns in the log
             if [ \$index_exit -ne 0 ]; then
@@ -587,7 +587,7 @@ process bwa_index {
                 elif grep -q "No space left on device" bwameth_index.log; then
                     echo "ERROR: Disk space failure detected. The system ran out of disk space."
                     echo "BWA indexing requires approximately 5x the reference genome size in disk space."
-                    echo "Please ensure at least $(echo "scale=2; ${ref_size_gb} * 5" | bc)GB of free disk space."
+                    echo "Please ensure at least \$(echo "scale=2; ${ref_size_gb} * 5" | bc)GB of free disk space."
 
                 # Generic error message
                 else
@@ -604,22 +604,22 @@ process bwa_index {
             if command -v bwameth.py >/dev/null 2>&1; then
                 echo "bwameth installed successfully, running indexing command"
                 # Check file size of the reference genome
-                ref_size=$(du -h "${real_genome_file}" | cut -f1)
+                ref_size=\$(du -h "${real_genome_file}" | cut -f1)
                 echo "Reference genome size: ${ref_size}"
 
                 # Estimate memory requirements (5-6x the reference size)
-                ref_size_bytes=$(stat -c %s "${real_genome_file}" 2>/dev/null || stat -f %z "${real_genome_file}")
-                ref_size_gb=$(echo "scale=2; ${ref_size_bytes}/1024/1024/1024" | bc)
+                ref_size_bytes=\$(stat -c %s "${real_genome_file}" 2>/dev/null || stat -f %z "${real_genome_file}")
+                ref_size_gb=\$(echo "scale=2; ${ref_size_bytes}/1024/1024/1024" | bc)
                 echo "Reference genome size in GB: ${ref_size_gb}"
-                echo "Estimated memory required: $(echo "scale=2; ${ref_size_gb} * 6" | bc)GB"
+                echo "Estimated memory required: \$(echo "scale=2; ${ref_size_gb} * 6" | bc)GB"
 
                 # Run with set -x to show commands being executed
-                echo "Starting BWA indexing at $(date)"
+                echo "Starting BWA indexing at \$(date)"
                 set -x
                 /usr/bin/time -v bwameth.py index \${real_genome_file} 2> bwameth_index.log || true
                 index_exit=\$?
                 set +x
-                echo "BWA indexing finished at $(date)"
+                echo "BWA indexing finished at \$(date)"
 
                 # Check for common error patterns in the log
                 if [ \$index_exit -ne 0 ]; then
@@ -635,7 +635,7 @@ process bwa_index {
                     elif grep -q "No space left on device" bwameth_index.log; then
                         echo "ERROR: Disk space failure detected. The system ran out of disk space."
                         echo "BWA indexing requires approximately 5x the reference genome size in disk space."
-                        echo "Please ensure at least $(echo "scale=2; ${ref_size_gb} * 5" | bc)GB of free disk space."
+                        echo "Please ensure at least \$(echo "scale=2; ${ref_size_gb} * 5" | bc)GB of free disk space."
 
                     # Generic error message
                     else

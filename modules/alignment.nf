@@ -450,7 +450,7 @@ process bwa_index {
      * If no index and no URL, User will have to debug.
      */
 
-    label 'low_cpu'
+    label 'medium_cpu'  // Upgraded from low_cpu to medium_cpu for more resources
     tag { genome }
     conda {
         // Skip procps-ng on macOS as it's not available
@@ -462,7 +462,8 @@ process bwa_index {
         }
     }
     storeDir "${params.storeDir}"
-    errorStrategy = 'retry'
+    // Only retry for specific exit codes that indicate transient issues
+    errorStrategy = { task.exitStatus in [143,137,104,134,139] ? 'retry' : 'finish' }
     maxRetries = 3
 
     output:
@@ -479,31 +480,78 @@ process bwa_index {
     echo "Looking for bwameth.py:"
     which bwameth.py || echo "bwameth.py not found in PATH"
 
+    # Print available memory and disk space for diagnostics
+    echo "Available memory:"
+    free -h || echo "free command not available"
+    echo "Available disk space:"
+    df -h . || echo "df command not available"
+
     real_genome_file="\$(basename ${params.path_to_genome_fasta})"
+    echo "Genome file: \${real_genome_file}"
+
+    # Create symbolic links to reference files
+    echo "Creating symbolic links to reference files"
     ln -sf "\$(dirname ${params.path_to_genome_fasta})/\${real_genome_file}"* . 
+    ls -la \${real_genome_file}* || echo "No files found matching \${real_genome_file}*"
 
     if [ ! -f "\${real_genome_file}.bwameth.c2t.bwt" ]; then
+        echo "Index file \${real_genome_file}.bwameth.c2t.bwt not found, need to create it"
+
         # if the reference .fa file is a url, not a local path
         if [ ! -f "\${real_genome_file}" ]; then
-            echo "Trying to download the reference"
+            echo "Reference file \${real_genome_file} not found locally, attempting to download"
             filename=\$(basename ${params.path_to_genome_fasta})
 
-            if ! curl -f -o \$filename ${params.path_to_genome_fasta}; then
+            if ! curl -f -v -o \$filename ${params.path_to_genome_fasta}; then
                 echo "Error: Failed to download \${params.path_to_genome_fasta}" >&2
+                echo "Please check if the URL is correct and accessible"
                 exit 1
             fi
+            echo "Download completed successfully"
+        else
+            echo "Reference file \${real_genome_file} found locally"
         fi
 
         # Try to find bwameth.py in the conda environment
         if command -v bwameth.py >/dev/null 2>&1; then
+            echo "Found bwameth.py in PATH, running indexing command"
+            # Run with set -x to show commands being executed
+            set -x
             bwameth.py index \${real_genome_file}
+            index_exit=\$?
+            set +x
+
+            if [ \$index_exit -ne 0 ]; then
+                echo "Error: bwameth.py index command failed with exit code \$index_exit"
+                echo "This might be due to insufficient memory or disk space"
+                echo "Check the output above for specific error messages"
+                exit \$index_exit
+            fi
         else
             echo "Error: bwameth.py not found in PATH. Installing bwameth manually..."
             pip install bwameth
-            bwameth.py index \${real_genome_file}
+            if command -v bwameth.py >/dev/null 2>&1; then
+                echo "bwameth installed successfully, running indexing command"
+                set -x
+                bwameth.py index \${real_genome_file}
+                index_exit=\$?
+                set +x
+
+                if [ \$index_exit -ne 0 ]; then
+                    echo "Error: bwameth.py index command failed with exit code \$index_exit"
+                    echo "This might be due to insufficient memory or disk space"
+                    echo "Check the output above for specific error messages"
+                    exit \$index_exit
+                fi
+            else
+                echo "Error: Failed to install bwameth using pip"
+                echo "Please check your internet connection and pip configuration"
+                exit 1
+            fi
         fi
     else
         echo "Index files already exist for \${real_genome_file}"
+        ls -la \${real_genome_file}*
     fi
     """
 }

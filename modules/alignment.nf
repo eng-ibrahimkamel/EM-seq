@@ -147,12 +147,6 @@ process alignReads {
         Math.max(Math.max(currentMemGB, minMemGB), fileBasedMemGB)
     )
 
-    // Ensure memoryGB is at least 0.1 to avoid "0 GB" memory allocation
-    if (memoryGB < 0.1) {
-        memoryGB = 0.1
-        println "Warning: Memory allocation was too low, setting to minimum 0.1 GB"
-    }
-
     task.memory = "${memoryGB} GB"
     println "Task memory set to ${task.memory} (SLURM mode: ${slurm_profile})"
 
@@ -374,21 +368,9 @@ process alignReads {
         mem_value_mb=\$(echo "\${mem_value}" | cut -d'.' -f1)
     fi
 
-    # Ensure mem_value_mb is at least 100 MB regardless of input
-    if [ -z "\${mem_value_mb}" ] || [ "\${mem_value_mb}" -lt 100 ]; then
-        mem_value_mb=100
-        echo "Setting minimum memory value to 100 MB"
-    fi
-
 
     # Calculate memory per thread (75% of total divided by thread count)
     threads=${sortThreads}
-    # Ensure threads is at least 1 to avoid division by zero
-    if [ "\${threads}" -lt 1 ]; then
-        threads=1
-    fi
-
-    # Calculate memory per thread with safeguards
     mem_per_thread=\$(( (mem_value_mb * 75 / 100) / threads ))
 
     # Ensure minimum of 100M per thread

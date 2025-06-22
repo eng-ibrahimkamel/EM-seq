@@ -24,17 +24,10 @@ process gc_bias {
     def fileSizeGB = bam.size() / (1024 * 1024 * 1024) // Convert bytes to GB
     def currentMemoryGB = task.memory.toGiga() // Convert task.memory to GB
 
-    // Picard needs more memory for larger files
-    // Scale memory with file size but ensure minimum and respect maximum
-    def memoryGB = Math.min(
-        params.max_memory.toGiga(),
-        Math.max(Math.max(currentMemoryGB, 2), Math.ceil(fileSizeGB * 1.5))
-    )
-
     // Calculate Xmx value for Picard (slightly less than total memory)
-    def picardXmx = Math.max(1, (memoryGB * 0.8).intValue())
-
-    task.memory = "${memoryGB} GB"
+    // Use the current task memory which is already constrained by nextflow.config
+    // Ensure minimum of 1GB for Picard
+    def picardXmx = Math.max(1, (currentMemoryGB * 0.8).intValue())
 
     """
     echo "Input BAM size: ${fileSizeGB} GB"
@@ -158,18 +151,10 @@ process insert_size_metrics {
     def fileSizeGB = bam.size() / (1024 * 1024 * 1024) // Convert bytes to GB
     def currentMemoryGB = task.memory.toGiga() // Convert task.memory to GB
 
-    // Picard needs more memory for larger files
-    // Scale memory with file size but ensure minimum and respect maximum
-    def memoryGB = Math.min(
-        params.max_memory.toGiga(),
-        Math.max(Math.max(currentMemoryGB, 2), Math.ceil(fileSizeGB * 1.2))
-    )
-
     // Calculate Xmx value for Picard (slightly less than total memory)
     // We need to run Picard twice, so allocate less memory per run
-    def picardXmx = Math.max(1, (memoryGB * 0.4).intValue())
-
-    task.memory = "${memoryGB} GB"
+    // Use the current task memory which is already constrained by nextflow.config
+    def picardXmx = Math.max(1, (currentMemoryGB * 0.4).intValue())
 
     """
     echo "Input BAM size: ${fileSizeGB} GB"
@@ -270,17 +255,9 @@ process picard_metrics {
     def fileSizeGB = bam.size() / (1024 * 1024 * 1024) // Convert bytes to GB
     def currentMemoryGB = task.memory.toGiga() // Convert task.memory to GB
 
-    // Picard needs more memory for larger files
-    // Scale memory with file size but ensure minimum and respect maximum
-    def memoryGB = Math.min(
-        params.max_memory.toGiga(),
-        Math.max(Math.max(currentMemoryGB, 2), Math.ceil(fileSizeGB * 1.2))
-    )
-
     // Calculate Xmx value for Picard (slightly less than total memory)
-    def picardXmx = Math.max(1, (memoryGB * 0.8).intValue())
-
-    task.memory = "${memoryGB} GB"
+    // Use the current task memory which is already constrained by nextflow.config
+    def picardXmx = Math.max(1, (currentMemoryGB * 0.8).intValue())
 
     """
     echo "Input BAM size: ${fileSizeGB} GB"

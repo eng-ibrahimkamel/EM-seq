@@ -127,28 +127,14 @@ process alignReads {
 
     script:
 
-    // Set memory, dynamically, based on input file size and respecting resource constraints
+    // Calculate file size for logging purposes
     def fileSizeGB = input_file1.size() / (1024 * 1024 * 1024) // Convert bytes to GB
-    def currentMemoryGB = task.memory.toGiga() // Convert task.memory to GB
 
-    // Check if we're running in SLURM environment and adjust memory accordingly
+    // Check if we're running in SLURM environment
     def slurm_profile = workflow.profile.contains('slurm')
-    def minMemoryGB = slurm_profile ? 0.8 : 7 // Use 800MB for SLURM, 7GB otherwise
 
-    // Calculate memory based on file size but respect limits
-    // Ensure all values are explicitly converted to double to avoid type ambiguity
-    def maxMemoryGB = params.max_memory.toGiga().doubleValue()
-    def currentMemGB = currentMemoryGB.doubleValue()
-    def minMemGB = minMemoryGB.doubleValue()
-    def fileBasedMemGB = Math.ceil(fileSizeGB * 1.5).doubleValue()
-
-    def memoryGB = Math.min(
-        maxMemoryGB,
-        Math.max(Math.max(currentMemGB, minMemGB), fileBasedMemGB)
-    )
-
-    task.memory = "${memoryGB} GB"
-    println "Task memory set to ${task.memory} (SLURM mode: ${slurm_profile})"
+    // Log the memory allocation (task.memory is set by the process configuration)
+    println "Task memory: ${task.memory} (SLURM mode: ${slurm_profile})"
 
     // Define sambamba_memory here, outside the bash script, respecting resource constraints
     // Ensure consistent types for Math operations
@@ -166,7 +152,7 @@ process alignReads {
     """
 
     echo "Input file size: ${fileSizeGB} GB"
-    echo "Memory allocated for this task: ${task.memory}"
+    echo "Memory allocated for this task: ${task.memory.toString()}"
 
     # Determine the genome index
     genome=\$(ls *.bwameth.c2t.bwt | sed 's/.bwameth.c2t.bwt//')

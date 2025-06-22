@@ -24,11 +24,17 @@ process gc_bias {
     def fileSizeGB = bam.size() / (1024 * 1024 * 1024) // Convert bytes to GB
     def currentMemoryGB = task.memory.toGiga() // Convert task.memory to GB
 
+    // Ensure all values are explicitly converted to double to avoid type ambiguity
+    def maxMemoryGB = params.max_memory.toGiga().doubleValue()
+    def currentMemGB = currentMemoryGB.doubleValue()
+    def minMemGB = 2.0d
+    def fileBasedMemGB = Math.ceil(fileSizeGB * 1.5).doubleValue()
+
     // Picard needs more memory for larger files
     // Scale memory with file size but ensure minimum and respect maximum
     def memoryGB = Math.min(
-        params.max_memory.toGiga(),
-        Math.max(Math.max(currentMemoryGB, 2), Math.ceil(fileSizeGB * 1.5))
+        maxMemoryGB,
+        Math.max(Math.max(currentMemGB, minMemGB), fileBasedMemGB)
     )
 
     // Calculate Xmx value for Picard (slightly less than total memory)
@@ -158,11 +164,17 @@ process insert_size_metrics {
     def fileSizeGB = bam.size() / (1024 * 1024 * 1024) // Convert bytes to GB
     def currentMemoryGB = task.memory.toGiga() // Convert task.memory to GB
 
+    // Ensure all values are explicitly converted to double to avoid type ambiguity
+    def maxMemoryGB = params.max_memory.toGiga().doubleValue()
+    def currentMemGB = currentMemoryGB.doubleValue()
+    def minMemGB = 2.0d
+    def fileBasedMemGB = Math.ceil(fileSizeGB * 1.2).doubleValue()
+
     // Picard needs more memory for larger files
     // Scale memory with file size but ensure minimum and respect maximum
     def memoryGB = Math.min(
-        params.max_memory.toGiga(),
-        Math.max(Math.max(currentMemoryGB, 2), Math.ceil(fileSizeGB * 1.2))
+        maxMemoryGB,
+        Math.max(Math.max(currentMemGB, minMemGB), fileBasedMemGB)
     )
 
     // Calculate Xmx value for Picard (slightly less than total memory)
@@ -270,11 +282,17 @@ process picard_metrics {
     def fileSizeGB = bam.size() / (1024 * 1024 * 1024) // Convert bytes to GB
     def currentMemoryGB = task.memory.toGiga() // Convert task.memory to GB
 
+    // Ensure all values are explicitly converted to double to avoid type ambiguity
+    def maxMemoryGB = params.max_memory.toGiga().doubleValue()
+    def currentMemGB = currentMemoryGB.doubleValue()
+    def minMemGB = 2.0d
+    def fileBasedMemGB = Math.ceil(fileSizeGB * 1.2).doubleValue()
+
     // Picard needs more memory for larger files
     // Scale memory with file size but ensure minimum and respect maximum
     def memoryGB = Math.min(
-        params.max_memory.toGiga(),
-        Math.max(Math.max(currentMemoryGB, 2), Math.ceil(fileSizeGB * 1.2))
+        maxMemoryGB,
+        Math.max(Math.max(currentMemGB, minMemGB), fileBasedMemGB)
     )
 
     // Calculate Xmx value for Picard (slightly less than total memory)

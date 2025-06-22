@@ -448,9 +448,14 @@ process bwa_index {
      * Attempts to link the reference index. If there is no index
      * we download it from the provided URL.
      * If no index and no URL, User will have to debug.
+     *
+     * Note: For a 3GB reference genome, this process requires:
+     * - At least 16GB of memory (5-6x the reference size)
+     * - Approximately 15GB of disk space (5x the reference size)
+     * - Significant CPU resources for faster indexing
      */
 
-    label 'medium_cpu'  // Upgraded from low_cpu to medium_cpu for more resources
+    label 'high_cpu'  // Upgraded to high_cpu for more resources to handle 3GB reference genome
     tag { genome }
     conda {
         // Skip procps-ng on macOS as it's not available
@@ -465,6 +470,16 @@ process bwa_index {
     // Only retry for specific exit codes that indicate transient issues
     errorStrategy = { task.exitStatus in [143,137,104,134,139] ? 'retry' : 'finish' }
     maxRetries = 3
+
+    // Custom memory allocation for bwa_index process
+    // BWA indexing typically requires 5-6x the reference genome size
+    memory = {
+        def slurm_profile = workflow.profile.contains('slurm')
+        // For a 3GB reference genome, allocate at least 16GB
+        def min_memory = slurm_profile ? 16.GB : 6.GB
+
+        check_max(min_memory * task.attempt, 'memory')
+    }
 
     output:
     path "*.{fa,fai,amb,ann,bwt,pac,sa,c2t}"
@@ -483,8 +498,21 @@ process bwa_index {
     # Print available memory and disk space for diagnostics
     echo "Available memory:"
     free -h || echo "free command not available"
+    echo "Memory allocated to this task: ${task.memory}"
     echo "Available disk space:"
     df -h . || echo "df command not available"
+
+    # Check if we have enough memory for a 3GB reference genome
+    # BWA indexing typically requires 5-6x the reference genome size
+    total_mem_kb=$(free | grep Mem | awk '{print $2}')
+    if [ -n "$total_mem_kb" ]; then
+        total_mem_gb=$(echo "scale=2; $total_mem_kb/1024/1024" | bc)
+        echo "Total system memory: ${total_mem_gb}GB"
+        if (( $(echo "$total_mem_gb < 15" | bc -l) )); then
+            echo "WARNING: Available memory (${total_mem_gb}GB) may be insufficient for indexing a 3GB reference genome"
+            echo "BWA indexing typically requires 5-6x the reference genome size (15-18GB recommended)"
+        fi
+    fi
 
     real_genome_file="\$(basename ${params.path_to_genome_fasta})"
     echo "Genome file: \${real_genome_file}"
@@ -515,16 +543,47 @@ process bwa_index {
         # Try to find bwameth.py in the conda environment
         if command -v bwameth.py >/dev/null 2>&1; then
             echo "Found bwameth.py in PATH, running indexing command"
+            # Check file size of the reference genome
+            ref_size=$(du -h "${real_genome_file}" | cut -f1)
+            echo "Reference genome size: ${ref_size}"
+
+            # Estimate memory requirements (5-6x the reference size)
+            ref_size_bytes=$(stat -c %s "${real_genome_file}" 2>/dev/null || stat -f %z "${real_genome_file}")
+            ref_size_gb=$(echo "scale=2; ${ref_size_bytes}/1024/1024/1024" | bc)
+            echo "Reference genome size in GB: ${ref_size_gb}"
+            echo "Estimated memory required: $(echo "scale=2; ${ref_size_gb} * 6" | bc)GB"
+
             # Run with set -x to show commands being executed
+            echo "Starting BWA indexing at $(date)"
             set -x
-            bwameth.py index \${real_genome_file}
+            /usr/bin/time -v bwameth.py index \${real_genome_file} 2> bwameth_index.log || true
             index_exit=\$?
             set +x
+            echo "BWA indexing finished at $(date)"
 
+            # Check for common error patterns in the log
             if [ \$index_exit -ne 0 ]; then
                 echo "Error: bwameth.py index command failed with exit code \$index_exit"
-                echo "This might be due to insufficient memory or disk space"
-                echo "Check the output above for specific error messages"
+
+                # Check for memory-related errors
+                if grep -q "Cannot allocate memory" bwameth_index.log; then
+                    echo "ERROR: Memory allocation failure detected. The system ran out of memory."
+                    echo "This is expected for a 3GB reference genome which requires ~18GB of RAM for indexing."
+                    echo "Please increase the memory allocation for this task or use a machine with more RAM."
+
+                # Check for disk space errors
+                elif grep -q "No space left on device" bwameth_index.log; then
+                    echo "ERROR: Disk space failure detected. The system ran out of disk space."
+                    echo "BWA indexing requires approximately 5x the reference genome size in disk space."
+                    echo "Please ensure at least $(echo "scale=2; ${ref_size_gb} * 5" | bc)GB of free disk space."
+
+                # Generic error message
+                else
+                    echo "This might be due to insufficient memory or disk space"
+                    echo "Check the log file (bwameth_index.log) for specific error messages:"
+                    cat bwameth_index.log
+                fi
+
                 exit \$index_exit
             fi
         else
@@ -532,15 +591,47 @@ process bwa_index {
             pip install bwameth
             if command -v bwameth.py >/dev/null 2>&1; then
                 echo "bwameth installed successfully, running indexing command"
+                # Check file size of the reference genome
+                ref_size=$(du -h "${real_genome_file}" | cut -f1)
+                echo "Reference genome size: ${ref_size}"
+
+                # Estimate memory requirements (5-6x the reference size)
+                ref_size_bytes=$(stat -c %s "${real_genome_file}" 2>/dev/null || stat -f %z "${real_genome_file}")
+                ref_size_gb=$(echo "scale=2; ${ref_size_bytes}/1024/1024/1024" | bc)
+                echo "Reference genome size in GB: ${ref_size_gb}"
+                echo "Estimated memory required: $(echo "scale=2; ${ref_size_gb} * 6" | bc)GB"
+
+                # Run with set -x to show commands being executed
+                echo "Starting BWA indexing at $(date)"
                 set -x
-                bwameth.py index \${real_genome_file}
+                /usr/bin/time -v bwameth.py index \${real_genome_file} 2> bwameth_index.log || true
                 index_exit=\$?
                 set +x
+                echo "BWA indexing finished at $(date)"
 
+                # Check for common error patterns in the log
                 if [ \$index_exit -ne 0 ]; then
                     echo "Error: bwameth.py index command failed with exit code \$index_exit"
-                    echo "This might be due to insufficient memory or disk space"
-                    echo "Check the output above for specific error messages"
+
+                    # Check for memory-related errors
+                    if grep -q "Cannot allocate memory" bwameth_index.log; then
+                        echo "ERROR: Memory allocation failure detected. The system ran out of memory."
+                        echo "This is expected for a 3GB reference genome which requires ~18GB of RAM for indexing."
+                        echo "Please increase the memory allocation for this task or use a machine with more RAM."
+
+                    # Check for disk space errors
+                    elif grep -q "No space left on device" bwameth_index.log; then
+                        echo "ERROR: Disk space failure detected. The system ran out of disk space."
+                        echo "BWA indexing requires approximately 5x the reference genome size in disk space."
+                        echo "Please ensure at least $(echo "scale=2; ${ref_size_gb} * 5" | bc)GB of free disk space."
+
+                    # Generic error message
+                    else
+                        echo "This might be due to insufficient memory or disk space"
+                        echo "Check the log file (bwameth_index.log) for specific error messages:"
+                        cat bwameth_index.log
+                    fi
+
                     exit \$index_exit
                 fi
             else

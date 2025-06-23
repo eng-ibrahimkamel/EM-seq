@@ -462,8 +462,31 @@ process bwa_index {
         }
     }
     storeDir "${params.storeDir}"
-    errorStrategy = 'retry'
+    // Only retry for specific exit codes that indicate transient issues
+    errorStrategy = { task.exitStatus in [143,137,104,134,139] ? 'retry' : 'finish' }
     maxRetries = 3
+
+    // Custom memory allocation for bwa_index process
+    // BWA indexing typically requires 5-6x the reference genome size
+    memory = {
+        def slurm_profile = workflow.profile.contains('slurm')
+        // For a 3GB reference genome, allocate at least 24GB
+        def min_memory = slurm_profile ? 24.GB : 6.GB
+
+        check_max(min_memory * task.attempt, 'memory')
+    }
+
+    // Add specific SLURM directives for this memory-intensive process
+    clusterOptions = {
+        def slurm_profile = workflow.profile.contains('slurm')
+        if (slurm_profile) {
+            // Request a node with high memory, without using specific constraints
+            // that might not be available in all SLURM configurations
+            return '--mem=24G'
+        } else {
+            return ''
+        }
+    }
 
     output:
     path "*.{fa,fai,amb,ann,bwt,pac,sa,c2t}"
@@ -479,8 +502,27 @@ process bwa_index {
     echo "Looking for bwameth.py:"
     which bwameth.py || echo "bwameth.py not found in PATH"
 
+    # Print available memory and disk space for diagnostics
+    echo "Available memory:"
+    free -h || echo "free command not available"
+    echo "Memory allocated to this task: ${task.memory}"
+    echo "Available disk space:"
+    df -h . || echo "df command not available"
+
+    # Check if we have enough memory for a 3GB reference genome
+    # BWA indexing typically requires 5-6x the reference genome size
+    total_mem_kb=\$(free | grep Mem | awk '{print \$2}')
+    if [ -n "\$total_mem_kb" ]; then
+        total_mem_gb=\$(echo "scale=2; \$total_mem_kb/1024/1024" | bc)
+        echo "Total system memory: \${total_mem_gb}GB"
+        if (( \$(echo "\$total_mem_gb < 15" | bc -l) )); then
+            echo "WARNING: Available memory (\${total_mem_gb}GB) may be insufficient for indexing a 3GB reference genome"
+            echo "BWA indexing typically requires 5-6x the reference genome size (15-18GB recommended)"
+        fi
+    fi
+
     real_genome_file="\$(basename ${params.path_to_genome_fasta})"
-    ln -sf "\$(dirname ${params.path_to_genome_fasta})/\${real_genome_file}"* . 
+    ln -sf "\$(dirname ${params.path_to_genome_fasta})/\${real_genome_file}"* .
 
     if [ ! -f "\${real_genome_file}.bwameth.c2t.bwt" ]; then
         # if the reference .fa file is a url, not a local path

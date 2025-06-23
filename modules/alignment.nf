@@ -448,9 +448,14 @@ process bwa_index {
      * Attempts to link the reference index. If there is no index
      * we download it from the provided URL.
      * If no index and no URL, User will have to debug.
+     *
+     * Note: For a 3GB reference genome, this process requires:
+     * - At least 16GB of memory (5-6x the reference size)
+     * - Approximately 15GB of disk space (5x the reference size)
+     * - Significant CPU resources for faster indexing
      */
 
-    label 'low_cpu'
+    label 'high_cpu'  // Upgraded to high_cpu for more resources to handle 3GB reference genome
     tag { genome }
     conda {
         // Skip procps-ng on macOS as it's not available
@@ -516,7 +521,7 @@ process bwa_index {
 
     # Create symbolic links to reference files
     echo "Creating symbolic links to reference files"
-    ln -sf "\$(dirname ${params.path_to_genome_fasta})/\${real_genome_file}"* . 
+    ln -sf "\$(dirname ${params.path_to_genome_fasta})/\${real_genome_file}"* .
 
     if [ ! -f "\${real_genome_file}.bwameth.c2t.bwt" ]; then
         # if the reference .fa file is a url, not a local path

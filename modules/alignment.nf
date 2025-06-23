@@ -498,7 +498,6 @@ process bwa_index {
     # Print available memory and disk space for diagnostics
     echo "Available memory:"
     free -h || echo "free command not available"
-    echo "Memory allocated to this task: ${task.memory}"
     echo "Available disk space:"
     df -h . || echo "df command not available"
 

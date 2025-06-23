@@ -495,19 +495,7 @@ process bwa_index {
     echo "Looking for bwameth.py:"
     which bwameth.py || echo "bwameth.py not found in PATH"
 
-    # Print available memory and disk space for diagnostics
-    echo "Available memory:"
-    free -h || echo "free command not available"
-    echo "Available disk space:"
-    df -h . || echo "df command not available"
-
-
-
     real_genome_file="\$(basename ${params.path_to_genome_fasta})"
-    echo "Genome file: \${real_genome_file}"
-
-    # Create symbolic links to reference files
-    echo "Creating symbolic links to reference files"
     ln -sf "\$(dirname ${params.path_to_genome_fasta})/\${real_genome_file}"* .
 
     if [ ! -f "\${real_genome_file}.bwameth.c2t.bwt" ]; then

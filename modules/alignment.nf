@@ -509,20 +509,14 @@ process bwa_index {
     echo "Available disk space:"
     df -h . || echo "df command not available"
 
-    # Check if we have enough memory for a 3GB reference genome
-    # BWA indexing typically requires 5-6x the reference genome size
-    total_mem_kb=\$(free | grep Mem | awk '{print \$2}')
-    if [ -n "\$total_mem_kb" ]; then
-        total_mem_gb=\$(echo "scale=2; \$total_mem_kb/1024/1024" | bc)
-        echo "Total system memory: \${total_mem_gb}GB"
-        if (( \$(echo "\$total_mem_gb < 15" | bc -l) )); then
-            echo "WARNING: Available memory (\${total_mem_gb}GB) may be insufficient for indexing a 3GB reference genome"
-            echo "BWA indexing typically requires 5-6x the reference genome size (15-18GB recommended)"
-        fi
-    fi
+
 
     real_genome_file="\$(basename ${params.path_to_genome_fasta})"
-    ln -sf "\$(dirname ${params.path_to_genome_fasta})/\${real_genome_file}"* .
+    echo "Genome file: \${real_genome_file}"
+
+    # Create symbolic links to reference files
+    echo "Creating symbolic links to reference files"
+    ln -sf "\$(dirname ${params.path_to_genome_fasta})/\${real_genome_file}"* . 
 
     if [ ! -f "\${real_genome_file}.bwameth.c2t.bwt" ]; then
         # if the reference .fa file is a url, not a local path

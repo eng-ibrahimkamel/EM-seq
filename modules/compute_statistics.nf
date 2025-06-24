@@ -48,13 +48,11 @@ process gc_bias {
     echo "Picard Xmx: ${picardXmx}g"
 
     genome=\$(ls *.bwameth.c2t.bwt | sed 's/.bwameth.c2t.bwt//')
-    echo "CPUs allocated: ${task.cpus}"
-
     samtools view -H ${bam} | grep "^@SQ" \
     | grep -v "plasmid_puc19\\|phage_lambda\\|phage_Xp12\\|phage_T4\\|EBV\\|chrM" \
     | awk -F":|\\t" '{print \$3"\\t"0"\\t"\$5}' > include_regions.bed
 
-    samtools view -@ ${task.cpus} -h -L include_regions.bed ${bam} | \
+    samtools view -h -L include_regions.bed ${bam} | \
     picard -Xmx${picardXmx}g CollectGcBiasMetrics \
         --IS_BISULFITE_SEQUENCED true --VALIDATION_STRINGENCY SILENT \
         -I /dev/stdin -O ${library}.gc_metrics -S ${library}.gc_summary_metrics \
@@ -84,8 +82,7 @@ process idx_stats {
 
     script:
     """
-    echo "CPUs allocated: ${task.cpus}"
-    samtools idxstats -@${task.cpus} ${bam} > ${library}.idxstat
+    samtools idxstats ${bam} > ${library}.idxstat
     """
 }
 
@@ -111,7 +108,6 @@ process flag_stats {
 
     script:
     """
-    echo "CPUs allocated: ${task.cpus}"
     samtools flagstat -@${task.cpus} ${bam} > ${library}.flagstat
     """
 }
@@ -138,9 +134,7 @@ process fastqc {
 
     shell:
     """
-    echo "CPUs allocated: ${task.cpus}"
-    # Use all available CPUs for FastQC
-    fastqc -f bam -t ${task.cpus} ${bam}
+    fastqc -f bam ${bam}
     """
 }
 
@@ -201,11 +195,9 @@ process insert_size_metrics {
     trap "rm -f \$good_mapq_file \$bad_mapq_file" EXIT # cleanup upon exit
 
     # Split BAM file into high and low mapping quality reads
-    # Use parallelization for samtools view
-    samtools view -@ ${task.cpus} -h -q 20 -b ${bam} > "\$good_mapq_file"
+    samtools view -h -q 20 -b ${bam} > "\$good_mapq_file"
     # For low mapping quality reads, use awk to filter instead of -Q option
-    # Use parallelization for samtools view
-    samtools view -@ ${task.cpus} -h ${bam} | awk 'substr(\$0,1,1)=="@" || (\$5<20 && \$5>=0)' | samtools view -@ ${task.cpus} -b > "\$bad_mapq_file"
+    samtools view -h ${bam} | awk 'substr(\$0,1,1)=="@" || (\$5<20 && \$5>=0)' | samtools view -b > "\$bad_mapq_file"
 
     # Run Picard on high mapping quality reads
     picard -Xmx${picardXmx}g CollectInsertSizeMetrics \
@@ -313,12 +305,7 @@ process picard_metrics {
     echo "Memory allocated for this task: ${task.memory}"
     echo "Picard Xmx: ${picardXmx}g"
 
-    echo "CPUs allocated: ${task.cpus}"
-
     genome=\$(ls *.fa 2>/dev/null || ls *.fasta 2>/dev/null)
-
-    # Picard's CollectAlignmentSummaryMetrics doesn't support multi-threading
-    # The NUM_PROCESSORS parameter is not recognized by this tool
     picard -Xmx${picardXmx}g CollectAlignmentSummaryMetrics \
         --VALIDATION_STRINGENCY SILENT -BS true -R \${genome} \
         -I ${bam} -O ${library}.alignment_summary_metrics.txt

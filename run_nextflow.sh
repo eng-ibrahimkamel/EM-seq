@@ -53,9 +53,6 @@ export PATH="${MINICONDA_SETUP_DIR}/bin:$PATH"
 log_info "Activating Nextflow environment"
 source "${MINICONDA_SETUP_DIR}/bin/activate" "${CONDA_ENV_NAME}"
 
-# Set Nextflow environment variables for better performance
-export NXF_OPTS="-Xms500M -Xmx4G -XX:+UseG1GC -XX:+UseStringDeduplication"
-log_info "Set Nextflow Java options for better performance"
 
 
 # Check if genome file exists

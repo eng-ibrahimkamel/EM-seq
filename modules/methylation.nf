@@ -61,8 +61,7 @@ process methylDackel_mbias {
     echo "CPUs allocated: ${cpusToUse}"
     genome=\$(ls *fa)
     echo -e "chr\tcontext\tstrand\tRead\tPosition\tnMethylated\tnUnmethylated\tnMethylated(+dups)\tnUnmethylated(+dups)" > ${library}_${barcodes}_combined_mbias.tsv
-    # Use parallelization for samtools view
-    chrs=(`samtools view -@ ${cpusToUse} -H ${md_bam} | grep @SQ | cut -f 2 | sed 's/SN://'| grep -v _random | grep -v chrUn | sed 's/|/\\|/'`)
+    chrs=(`samtools view -H ${md_bam} | grep @SQ | cut -f 2 | sed 's/SN://'| grep -v _random | grep -v chrUn | sed 's/|/\\|/'`)
 
     for chr in \${chrs[*]}; do
         for context in CHH CHG CpG; do

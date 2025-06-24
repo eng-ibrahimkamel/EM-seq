@@ -190,7 +190,7 @@ process alignReads {
 
     flowcell_from_bam() {
         set +o pipefail
-        samtools view -@ ${task.cpus} \$1 | head -n1 | cut -d":" -f3
+        samtools view \$1 | head -n1 | cut -d":" -f3
         set -o pipefail
     }
 
@@ -213,8 +213,8 @@ process alignReads {
         local file=\$1
         local type=\$2
         if [ "\$type" == "bam" ]; then
-            barcodes=\$(samtools view -@ ${task.cpus} -H \$file | grep @RG | awk '{for (i=1;i<=NF;i++) {if (\$i~/BC:/) {print substr(\$i,4,length(\$i))} } }' | head -n1)
-            rg_line=\$(samtools view -@ ${task.cpus} -H \$file | grep "^@RG" | sed 's/\\t/\\\\t/g' | head -n1)
+            barcodes=\$(samtools view -H \$file | grep @RG | awk '{for (i=1;i<=NF;i++) {if (\$i~/BC:/) {print substr(\$i,4,length(\$i))} } }' | head -n1)
+            rg_line=\$(samtools view -H \$file | grep "^@RG" | sed 's/\\t/\\\\t/g' | head -n1)
         else
             barcodes=(\$(barcodes_from_fastq \$file))
             rg_line="@RG\\tID:\${barcodes}\\tSM:${library}\\tBC:\${barcodes}"
@@ -229,7 +229,7 @@ process alignReads {
             frac_reads=1
         else
             if [ "\$type" == "bam" ]; then
-                n_reads=\$(samtools view -@ ${task.cpus} -c -F 2304 \$file)
+                n_reads=\$(samtools view -c -F 2304 \$file)
             else
                 n_reads=\$(get_nreads_from_fastq \$file)
             fi
@@ -293,7 +293,7 @@ process alignReads {
         "bam")
             get_barcodes_and_rg_line ${input_file1} "bam"
             get_frac_reads ${input_file1} "bam"
-            stream_reads="samtools view -@ ${task.cpus} -u -h ${input_file1}"
+            stream_reads="samtools view -u -h ${input_file1}"
             flowcell=\$(flowcell_from_bam ${input_file1})
             ;;
         "fastq_single_end")
@@ -311,14 +311,13 @@ process alignReads {
 
     if [ \${frac_reads} -lt 1 ]; then
         downsample_seed_frac=\$(awk -v seed=${params.downsample_seed} -v frac=\${frac_reads} 'BEGIN { printf "%.4f", seed + frac }')
-        stream_reads="\${stream_reads} | samtools view -@ ${task.cpus} -u -s \${downsample_seed_frac}"
+        stream_reads="\${stream_reads} | samtools view -u -s \${downsample_seed_frac}"
     fi
 
     base_outputname="${library}_\${barcodes}_\${flowcell}"
 
     set +o pipefail
-    # Use parallelization for samtools view
-    inst_name=\$(samtools view -@ ${task.cpus} ${input_file1} | head -n 1 | cut -d ":" -f 1)
+    inst_name=\$(samtools view ${input_file1} | head -n 1 | cut -d ":" -f 1)
     set -o pipefail
 
     trim_polyg=\$(echo "\${inst_name}" | awk '{if (\$1~/^A0|^NB|^NS|^VH/) {print "--trim_poly_g"} else {print ""}}')
@@ -330,7 +329,7 @@ process alignReads {
     # Step 1: Process reads and align
 
     eval \${stream_reads} \${bam2fastq} \
-    | fastp --stdin --stdout -l 2 -Q \${trim_polyg} --interleaved_in --overrepresentation_analysis -j "\${base_outputname}.fastp.json" -w ${task.cpus} 2> fastp.stderr \
+    | fastp --stdin --stdout -l 2 -Q \${trim_polyg} --interleaved_in --overrepresentation_analysis -j "\${base_outputname}.fastp.json" 2> fastp.stderr \
     | bwameth.py -p -t ${bwamethThreads} --read-group "\${rg_line}" --reference \${genome} /dev/stdin 2> "\${base_outputname}.log.bwamem" > "\${base_outputname}.sam"
 
     # Check exit status of the bwameth.py command
@@ -383,7 +382,7 @@ process alignReads {
 
     echo "Memory per thread for samtools sort: \$sort_mem_per_thread"
 
-    samtools view -@ ${task.cpus} -u "\${base_outputname}.reheadered.sam" | \
+    samtools view -u "\${base_outputname}.reheadered.sam" | \
     samtools sort -m \$sort_mem_per_thread -@ ${sortThreads} -T ${params.tmp_dir}/tmp -o "\${base_outputname}.aln.bam" -
 
     # Index the BAM file
@@ -423,17 +422,12 @@ process mergeAndMarkDuplicates {
     def picardMemGB = Math.max(1, task.memory.toGiga().intValue())
 
     """
-    echo "CPUs allocated: ${task.cpus}"
-
     set +o pipefail
-    # Use parallelization for samtools view
-    inst_name=\$(samtools view -@ ${task.cpus} ${bam} | head -n1 | cut -d ":" -f1);
+    inst_name=\$(samtools view ${bam} | head -n1 | cut -d ":" -f1);
     set -o pipefail
 
     optical_distance=\$(echo \${inst_name} | awk '{if (\$1~/^M0|^NS|^NB/) {print 100} else {print 2500}}')
 
-    # Calculate optimal number of threads for Picard
-    # Picard benefits from multiple threads for MarkDuplicates
     picard -Xmx${picardMemGB}g MarkDuplicates \
         --TAGGING_POLICY All \
         --OPTICAL_DUPLICATE_PIXEL_DISTANCE \${optical_distance} \
@@ -488,13 +482,9 @@ process bwa_index {
     }
 
     output:
-    path "*.{fa,fai,amb,ann,bwt,pac,sa,c2t,bwameth.c2t.*}"
+    path "*.{fa,fai,amb,ann,bwt,pac,sa,c2t}"
 
     script:
-    // Calculate optimal number of threads for BWA indexing
-    // Based on the issue description, bwameth.py supports threading via the --threads parameter
-    def bwaThreads = Math.max(1, task.cpus.intValue() - 1)
-
     """
     # Debug: Print conda environment info
     echo "Conda environment path: \$CONDA_PREFIX"
@@ -504,11 +494,6 @@ process bwa_index {
     echo \$PATH
     echo "Looking for bwameth.py:"
     which bwameth.py || echo "bwameth.py not found in PATH"
-
-    # Print resource allocation
-    echo "CPU cores allocated: ${task.cpus}"
-    echo "Memory allocated: ${task.memory}"
-    echo "Using ${bwaThreads} threads for BWA indexing"
 
     real_genome_file="\$(basename ${params.path_to_genome_fasta})"
     ln -sf "\$(dirname ${params.path_to_genome_fasta})/\${real_genome_file}"* .
@@ -527,23 +512,11 @@ process bwa_index {
 
         # Try to find bwameth.py in the conda environment
         if command -v bwameth.py >/dev/null 2>&1; then
-            echo "Starting BWA indexing with ${bwaThreads} threads at \$(date)"
-            # bwameth.py index does not support the --threads parameter
-            # The threading is handled internally by BWA through OMP_NUM_THREADS
-            export OMP_NUM_THREADS=${bwaThreads}
-            echo "Set OMP_NUM_THREADS=${bwaThreads} to control BWA parallelization"
             bwameth.py index \${real_genome_file}
-            echo "BWA indexing completed at \$(date)"
         else
             echo "Error: bwameth.py not found in PATH. Installing bwameth manually..."
             pip install bwameth
-            echo "Starting BWA indexing with ${bwaThreads} threads at \$(date)"
-            # bwameth.py index does not support the --threads parameter
-            # The threading is handled internally by BWA through OMP_NUM_THREADS
-            export OMP_NUM_THREADS=${bwaThreads}
-            echo "Set OMP_NUM_THREADS=${bwaThreads} to control BWA parallelization"
             bwameth.py index \${real_genome_file}
-            echo "BWA indexing completed at \$(date)"
         fi
     else
         echo "Index files already exist for \${real_genome_file}"

@@ -100,6 +100,31 @@ process send_email {
 process alignReads {
     label 'high_cpu'
     tag { library }
+    // Add specific error strategy for this process to handle memory issues
+    errorStrategy = { task.exitStatus in [143,137,104,134,139] || task.attempt <= 3 ? 'retry' : 'finish' }
+    // Increase max retries for this process
+    maxRetries = 3
+    // Add memory directive to ensure adequate memory allocation
+    memory = { 
+        def slurm_profile = workflow.profile.contains('slurm')
+        def fileSizeGB = input_file1.size() / (1024 * 1024 * 1024) // Convert bytes to GB
+        // Calculate memory based on file size with a higher multiplier
+        def fileBasedMemGB = Math.ceil(fileSizeGB * 2.5).doubleValue() // Increased multiplier from 1.5 to 2.5
+        def minMemGB = slurm_profile ? 8.GB : 4.GB // Increased minimum memory
+
+        // Use the maximum of calculated memory or minimum memory, multiplied by attempt number
+        def memToUse = Math.max(minMemGB.toGiga(), fileBasedMemGB).GB * task.attempt
+
+        // Cap at max_memory
+        check_max(memToUse, 'memory')
+    }
+    // Add time directive to ensure adequate time allocation
+    time = { 
+        def slurm_profile = workflow.profile.contains('slurm')
+        def default_time = slurm_profile ? 48.h : 12.h // Increased from 24h to 48h for SLURM
+
+        check_max(default_time * task.attempt, 'time')
+    }
     conda {
         // Skip procps-ng on macOS as it's not available
         def os = System.getProperty("os.name").toLowerCase()
@@ -326,20 +351,73 @@ process alignReads {
     bam2fastq="| samtools collate -f -r 100000 -u /dev/stdin -O | samtools fastq -n  /dev/stdin"
     # -n in samtools because bwameth needs space not "/" in the header (/1 /2)
 
-    # Break the pipeline into smaller steps to isolate issues
-    # Step 1: Process reads and align
+    # Monitor memory usage during alignment
+    echo "Starting alignment with memory monitoring..."
+    echo "Available memory before alignment:"
+    free -h || echo "free command not available"
 
+    # Break the pipeline into smaller steps to isolate issues and better manage memory
+    # Step 1: Process reads with fastp and save to intermediate file
+    echo "Step 1: Processing reads with fastp..."
     eval \${stream_reads} \${bam2fastq} \
-    | fastp --stdin --stdout -l 2 -Q \${trim_polyg} --interleaved_in --overrepresentation_analysis -j "\${base_outputname}.fastp.json" -w ${task.cpus} 2> fastp.stderr \
-    | bwameth.py -p -t ${bwamethThreads} --read-group "\${rg_line}" --reference \${genome} /dev/stdin 2> "\${base_outputname}.log.bwamem" > "\${base_outputname}.sam"
+    | fastp --stdin --stdout -l 2 -Q \${trim_polyg} --interleaved_in --overrepresentation_analysis -j "\${base_outputname}.fastp.json" -w ${task.cpus} 2> fastp.stderr > "\${base_outputname}.processed.fq"
+
+    fastp_exit=\$?
+    if [ \$fastp_exit -ne 0 ]; then
+        echo "Fastp processing failed with exit code \$fastp_exit"
+        echo "This might be due to memory constraints. Check the fastp.stderr file for details."
+        exit \$fastp_exit
+    fi
+
+    # Check intermediate file size
+    echo "Processed FASTQ size: \$(du -h "\${base_outputname}.processed.fq" | cut -f1)"
+
+    # Step 2: Run BWA-MEM alignment with memory monitoring
+    echo "Step 2: Running BWA-MEM alignment..."
+    echo "Available memory before BWA-MEM:"
+    free -h || echo "free command not available"
+
+    # Set memory limit for BWA-MEM (80% of available memory)
+    mem_value=\$(echo "${task.memory}" | sed -E 's/([0-9.]+).*/\\1/')
+    mem_unit=\$(echo "${task.memory}" | sed -E 's/[0-9.]+ *([A-Za-z]+).*/\\1/')
+
+    # Calculate BWA memory limit (80% of allocated memory)
+    if [[ "\${mem_unit}" == "GB" || "\${mem_unit}" == "gb" || "\${mem_unit}" == "G" || "\${mem_unit}" == "g" ]]; then
+        bwa_mem_limit=\$(echo "\${mem_value} * 0.8" | bc | cut -d'.' -f1)
+    else
+        bwa_mem_limit=\$(echo "\${mem_value} * 0.8 / 1024" | bc | cut -d'.' -f1)
+    fi
+
+    echo "Setting BWA memory limit to approximately \${bwa_mem_limit}GB"
+
+    # Run BWA-MEM with controlled memory usage
+    cat "\${base_outputname}.processed.fq" | \
+    bwameth.py -p -t ${bwamethThreads} --read-group "\${rg_line}" --reference \${genome} /dev/stdin 2> "\${base_outputname}.log.bwamem" > "\${base_outputname}.sam"
 
     # Check exit status of the bwameth.py command
     bwameth_exit=\$?
     if [ \$bwameth_exit -ne 0 ]; then
         echo "BWA-MEM alignment failed with exit code \$bwameth_exit"
         echo "This might be due to memory constraints. Check the log file for details."
+
+        # Check if we can find memory-related errors in the log
+        if grep -q "out of memory" "\${base_outputname}.log.bwamem" || grep -q "allocate" "\${base_outputname}.log.bwamem"; then
+            echo "Memory-related error detected in BWA-MEM log"
+            echo "Current memory usage:"
+            free -h || echo "free command not available"
+
+            # If this is not the last retry, exit with a code that will trigger a retry
+            if [ ${task.attempt} -lt 3 ]; then
+                echo "Will retry with more memory"
+                exit 137  # Memory error code that will trigger retry
+            fi
+        fi
+
         exit \$bwameth_exit
     fi
+
+    # Clean up intermediate file to save space
+    rm -f "\${base_outputname}.processed.fq"
 
     # Step 2: Reheader the SAM file
     cat "\${base_outputname}.sam" | reheader_sam /dev/stdin > "\${base_outputname}.reheadered.sam"
@@ -349,6 +427,10 @@ process alignReads {
     touch "\${base_outputname}.nonconverted.tsv"
 
     # Step 4: Convert to BAM and sort using samtools instead of sambamba
+    echo "Step 3: Converting SAM to BAM and sorting..."
+    echo "Available memory before SAM to BAM conversion:"
+    free -h || echo "free command not available"
+
     # Calculate memory limit for samtools sort based on available memory
     # Use a simpler approach to avoid AWK escaping issues
     mem_value=\$(echo "${task.memory}" | sed -E 's/([0-9.]+).*/\\1/')
@@ -369,10 +451,10 @@ process alignReads {
         mem_value_mb=\$(echo "\${mem_value}" | cut -d'.' -f1)
     fi
 
-
-    # Calculate memory per thread (75% of total divided by thread count)
+    # Calculate memory per thread (65% of total divided by thread count)
+    # Reduced from 75% to 65% to leave more memory for the OS and other processes
     threads=${sortThreads}
-    mem_per_thread=\$(( (mem_value_mb * 75 / 100) / threads ))
+    mem_per_thread=\$(( (mem_value_mb * 65 / 100) / threads ))
 
     # Ensure minimum of 100M per thread
     if [ \${mem_per_thread} -lt 100 ]; then
@@ -382,15 +464,87 @@ process alignReads {
     sort_mem_per_thread="\${mem_per_thread}M"
 
     echo "Memory per thread for samtools sort: \$sort_mem_per_thread"
+    echo "Using ${sortThreads} threads for sorting"
 
-    samtools view -@ ${task.cpus} -u "\${base_outputname}.reheadered.sam" | \
-    samtools sort -m \$sort_mem_per_thread -@ ${sortThreads} -T ${params.tmp_dir}/tmp -o "\${base_outputname}.aln.bam" -
+    # First convert SAM to BAM
+    echo "Converting SAM to BAM..."
+    samtools view -@ ${task.cpus} -u "\${base_outputname}.reheadered.sam" > "\${base_outputname}.unsorted.bam"
+
+    view_exit=\$?
+    if [ \$view_exit -ne 0 ]; then
+        echo "SAM to BAM conversion failed with exit code \$view_exit"
+        echo "This might be due to memory constraints."
+
+        # If this is not the last retry, exit with a code that will trigger a retry
+        if [ ${task.attempt} -lt 3 ]; then
+            echo "Will retry with more memory"
+            exit 137  # Memory error code that will trigger retry
+        fi
+
+        exit \$view_exit
+    fi
+
+    # Remove SAM file to save space
+    rm -f "\${base_outputname}.reheadered.sam"
+
+    # Then sort the BAM file
+    echo "Sorting BAM file..."
+    echo "Available memory before sorting:"
+    free -h || echo "free command not available"
+
+    # Use a temporary directory with enough space
+    TEMP_SORT_DIR="\${TMPDIR:-${params.tmp_dir}}/sort_\${RANDOM}"
+    mkdir -p "\$TEMP_SORT_DIR"
+
+    samtools sort -m \$sort_mem_per_thread -@ ${sortThreads} -T "\$TEMP_SORT_DIR/tmp" -o "\${base_outputname}.aln.bam" "\${base_outputname}.unsorted.bam"
+
+    sort_exit=\$?
+    if [ \$sort_exit -ne 0 ]; then
+        echo "BAM sorting failed with exit code \$sort_exit"
+        echo "This might be due to memory constraints or disk space issues."
+
+        # Check disk space
+        echo "Disk space in temp directory:"
+        df -h "\$TEMP_SORT_DIR" || echo "df command not available"
+
+        # If this is not the last retry, exit with a code that will trigger a retry
+        if [ ${task.attempt} -lt 3 ]; then
+            echo "Will retry with more memory"
+            exit 137  # Memory error code that will trigger retry
+        fi
+
+        exit \$sort_exit
+    fi
+
+    # Clean up temporary directory
+    rm -rf "\$TEMP_SORT_DIR"
+
+    # Remove unsorted BAM to save space
+    rm -f "\${base_outputname}.unsorted.bam"
 
     # Index the BAM file
+    echo "Indexing BAM file..."
     samtools index "\${base_outputname}.aln.bam"
 
-    # Clean up intermediate files
-    rm -f "\${base_outputname}.sam" "\${base_outputname}.reheadered.sam"
+    index_exit=\$?
+    if [ \$index_exit -ne 0 ]; then
+        echo "BAM indexing failed with exit code \$index_exit"
+
+        # If this is not the last retry, exit with a code that will trigger a retry
+        if [ ${task.attempt} -lt 3 ]; then
+            echo "Will retry"
+            exit 137
+        fi
+
+        exit \$index_exit
+    fi
+
+    # Clean up any remaining intermediate files
+    rm -f "\${base_outputname}.sam"
+
+    echo "Alignment process completed successfully"
+    echo "Final memory usage:"
+    free -h || echo "free command not available"
 
 
     """
@@ -400,6 +554,31 @@ process mergeAndMarkDuplicates {
     label 'high_cpu'
     tag { library }
     publishDir "${params.outputDir}/markduped_bams", mode: 'copy', pattern: '*.md.{bam,bai}'
+    // Add specific error strategy for this process to handle memory issues
+    errorStrategy = { task.exitStatus in [143,137,104,134,139] || task.attempt <= 3 ? 'retry' : 'finish' }
+    // Increase max retries for this process
+    maxRetries = 3
+    // Add memory directive to ensure adequate memory allocation
+    memory = { 
+        def slurm_profile = workflow.profile.contains('slurm')
+        def fileSizeGB = bam.size() / (1024 * 1024 * 1024) // Convert bytes to GB
+        // Calculate memory based on file size with a higher multiplier for Picard
+        def fileBasedMemGB = Math.ceil(fileSizeGB * 3.0).doubleValue() // Higher multiplier for Picard
+        def minMemGB = slurm_profile ? 8.GB : 4.GB // Increased minimum memory
+
+        // Use the maximum of calculated memory or minimum memory, multiplied by attempt number
+        def memToUse = Math.max(minMemGB.toGiga(), fileBasedMemGB).GB * task.attempt
+
+        // Cap at max_memory
+        check_max(memToUse, 'memory')
+    }
+    // Add time directive to ensure adequate time allocation
+    time = { 
+        def slurm_profile = workflow.profile.contains('slurm')
+        def default_time = slurm_profile ? 48.h : 12.h // Increased from 24h to 48h for SLURM
+
+        check_max(default_time * task.attempt, 'time')
+    }
     conda {
         // Skip procps-ng on macOS as it's not available
         def os = System.getProperty("os.name").toLowerCase()
@@ -420,10 +599,21 @@ process mergeAndMarkDuplicates {
 
     script:
     // Calculate picard memory ensuring consistent types
-    def picardMemGB = Math.max(1, task.memory.toGiga().intValue())
+    def fileSizeGB = bam.size() / (1024 * 1024 * 1024) // Convert bytes to GB
+    def currentMemoryGB = task.memory.toGiga() // Convert task.memory to GB
+
+    // Calculate Picard memory - use 80% of available memory
+    def picardMemGB = Math.max(1, (currentMemoryGB * 0.8).intValue())
 
     """
+    echo "Input BAM file size: ${fileSizeGB} GB"
     echo "CPUs allocated: ${task.cpus}"
+    echo "Memory allocated for this task: ${task.memory}"
+    echo "Picard memory allocation: ${picardMemGB}g"
+
+    # Monitor memory usage
+    echo "Available memory before processing:"
+    free -h || echo "free command not available"
 
     set +o pipefail
     # Use parallelization for samtools view
@@ -432,12 +622,22 @@ process mergeAndMarkDuplicates {
 
     optical_distance=\$(echo \${inst_name} | awk '{if (\$1~/^M0|^NS|^NB/) {print 100} else {print 2500}}')
 
+    # Create a dedicated temp directory with random name to avoid conflicts
+    TEMP_DIR="\${TMPDIR:-${params.tmp_dir}}/picard_\${RANDOM}"
+    mkdir -p "\$TEMP_DIR"
+    echo "Using temporary directory: \$TEMP_DIR"
+
+    # Check disk space in temp directory
+    echo "Disk space in temp directory:"
+    df -h "\$TEMP_DIR" || echo "df command not available"
+
     # Calculate optimal number of threads for Picard
     # Picard benefits from multiple threads for MarkDuplicates
+    echo "Running Picard MarkDuplicates..."
     picard -Xmx${picardMemGB}g MarkDuplicates \
         --TAGGING_POLICY All \
         --OPTICAL_DUPLICATE_PIXEL_DISTANCE \${optical_distance} \
-        --TMP_DIR ${params.tmp_dir} \
+        --TMP_DIR "\$TEMP_DIR" \
         --CREATE_INDEX true \
         --MAX_RECORDS_IN_RAM 5000000 \
         --BARCODE_TAG "RX" \
@@ -446,6 +646,51 @@ process mergeAndMarkDuplicates {
         -I ${bam} \
         -O ${library}_${barcodes}.md.bam \
         -M ${library}.markdups_log
+
+    picard_exit=\$?
+    if [ \$picard_exit -ne 0 ]; then
+        echo "Picard MarkDuplicates failed with exit code \$picard_exit"
+        echo "This might be due to memory constraints or disk space issues."
+
+        # Check memory usage
+        echo "Current memory usage:"
+        free -h || echo "free command not available"
+
+        # Check disk space
+        echo "Disk space in temp directory:"
+        df -h "\$TEMP_DIR" || echo "df command not available"
+
+        # Clean up temp directory
+        rm -rf "\$TEMP_DIR"
+
+        # If this is not the last retry, exit with a code that will trigger a retry
+        if [ ${task.attempt} -lt 3 ]; then
+            echo "Will retry with more memory"
+            exit 137  # Memory error code that will trigger retry
+        fi
+
+        exit \$picard_exit
+    fi
+
+    # Verify the output files exist and are valid
+    if [ ! -s "${library}_${barcodes}.md.bam" ]; then
+        echo "Error: Output BAM file is empty or does not exist"
+        exit 1
+    fi
+
+    if [ ! -s "${library}_${barcodes}.md.bai" ]; then
+        echo "Error: Output BAI file is empty or does not exist"
+        # Try to create the index if it doesn't exist
+        echo "Attempting to create index manually..."
+        samtools index "${library}_${barcodes}.md.bam"
+    fi
+
+    # Clean up temp directory
+    rm -rf "\$TEMP_DIR"
+
+    echo "MarkDuplicates process completed successfully"
+    echo "Final memory usage:"
+    free -h || echo "free command not available"
     """
 }
 

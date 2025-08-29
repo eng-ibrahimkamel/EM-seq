@@ -1,0 +1,89 @@
+flowchart-diagram
+
+title Methylation Sequencing Repository Flowchart
+direction right
+// Flowchart for Methylation Sequencing Repository
+
+title Methylation Sequencing Repository Flowchart
+
+// Main pipeline nodes
+MainPipeline [color: lightblue] {
+  Start Main Pipeline [shape: oval]
+  Check Genome File [shape: diamond]
+  Index Reference [shape: rectangle]
+  Detect Libraries [shape: rectangle]
+  Check Library Read Count [shape: diamond]
+  Notify Low Read Libraries [shape: oval]
+  Library Ready [shape: oval]
+  Align Reads [shape: rectangle]
+  Mark Duplicates [shape: rectangle]
+  Extract Methylation Data [shape: rectangle]
+  Compute Summary Statistics [shape: rectangle]
+  Aggregation Decision [shape: diamond]
+  Run Aggregation [shape: rectangle]
+  Generate Final Report [shape: oval]
+  End Main Pipeline [shape: oval]
+}
+
+// Legacy EM-seq pipeline nodes
+LegacyPipeline [color: lightgreen] {
+  Start Legacy Pipeline [shape: oval]
+  Detect FASTQ Pairs [shape: rectangle]
+  Run Mapping [shape: rectangle]
+  Merge and Deduplicate [shape: rectangle]
+  Bias Analysis [shape: rectangle]
+  Extract Methylation [shape: rectangle]
+  LegacyStats [shape: rectangle]
+  Legacy MultiQC [shape: oval]
+  Combine Mbias Tables [shape: rectangle]
+  Combine Mbias PDF [shape: rectangle]
+  End Legacy Pipeline [shape: oval]
+}
+
+// Detail of legacy pipeline statistics steps
+LegacyStats [color: yellow] {
+  Select Human Reads
+  Run FastQC
+  Summarize Nonconverted Reads
+  Combine Nonconverted Results
+  Generate Flagstats
+  Generate Basic Alignment Stats
+  Collect GC Bias Metrics
+  Collect Picard Metrics
+  Compute Insert Size Metrics
+  Compute Human GC Bias
+  Compute Human Insert Size
+  Calculate Coverage Statistics
+}
+
+// Relationships for Main pipeline
+Start Main Pipeline > Check Genome File
+Check Genome File > Index Reference: Yes
+Check Genome File > End Main Pipeline: No
+Index Reference > Detect Libraries
+Detect Libraries > Check Library Read Count
+Check Library Read Count > Notify Low Read Libraries: No
+Check Library Read Count > Library Ready: Yes
+Notify Low Read Libraries > End Main Pipeline
+Library Ready > Align Reads
+Align Reads > Mark Duplicates
+Mark Duplicates > Extract Methylation Data
+Extract Methylation Data > Compute Summary Statistics
+Compute Summary Statistics > Aggregation Decision
+Aggregation Decision > Run Aggregation: Yes
+Aggregation Decision > Generate Final Report: No
+Run Aggregation > Generate Final Report
+Generate Final Report > End Main Pipeline
+
+// Relationships for Legacy EM-seq pipeline
+Start Legacy Pipeline > Detect FASTQ Pairs
+Detect FASTQ Pairs > Run Mapping
+Run Mapping > Merge and Deduplicate
+Merge and Deduplicate > Bias Analysis
+Bias Analysis > Extract Methylation
+Extract Methylation > LegacyStats
+Legacy MultiQC > Combine Mbias Tables
+Combine Mbias Tables > Combine Mbias PDF
+Combine Mbias PDF > End Legacy Pipeline
+Legacy MultiQC < LegacyStats
+
